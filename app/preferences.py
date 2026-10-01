@@ -65,11 +65,15 @@ def save(values, persist=True):
         checked[key] = value
     if persist:
         for key, value in checked.items():
+            if key in {"ai_provider","ai_model","ai_base_url"} and get(key) != value:
+                db.set_setting("ai_health",None)
             db.set_setting(key, value)
 
 def bootstrap_dev_env():
     """Optional dev import; bundled builds never read a .env file."""
     if getattr(sys, "frozen", False) or os.getenv("XEA_TESTING"):
+        return
+    if db.get_setting("dev_env_imported",False):
         return
     from dotenv import dotenv_values
     values = dotenv_values(".env")
@@ -82,3 +86,6 @@ def bootstrap_dev_env():
         target = "ai_api_key_" + get("ai_provider") if key == "ai_api_key" else key
         if values.get(key.upper()) and not store.get(target):
             store.set(target, values[key.upper()])
+
+    if values:
+        db.set_setting("dev_env_imported",True)

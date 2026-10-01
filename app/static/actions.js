@@ -14,6 +14,7 @@ if(a==='web-search'){openExternal('https://x.com/search?'+new URLSearchParams({q
 if(a==='rank-search'){const d=await api('/api/search/rank','POST',{ids:lastSearchIds.slice(0,5)});toast(d.message);location.hash='queue';return render()}
 if(a==='retry-search'){await api('/api/search/retry-access','POST');toast('The next search will test access again.');return}
 if(a==='fetch-import'){await api('/api/feed/import','POST',{...values($('#import-form')),fetch:true});toast('Post imported');return render()}
+if(a==='import-draft'){const post=await api('/api/feed/import','POST',values($('#import-form')));const d=await api('/api/generate/reply','POST',{feed_id:post.id});toast(d.skipped?'AI chose to skip this post.':'Draft ready for review');location.hash='queue';return render()}
 if(a==='generate-reply'){const d=await api('/api/generate/reply','POST',{feed_id:id});toast(d.skipped?'AI chose to skip this post.':'Draft ready for review');location.hash='queue';return render()}
 if(['save-feed','unsave-feed','ignore-feed'].includes(a)){await api('/api/feed/'+id+'/'+a.split('-')[0],'POST');return render()}
 if(a==='save-draft'){await saveEdited(id);toast('Saved. Edited content needs approval again.');return render()}
@@ -26,11 +27,12 @@ if(a==='regenerate'){const d=await saveEdited(id),style=$('#style-'+id).value;aw
 if(a==='mute-author'||a==='mute-topic'){const d=draftCache.find(x=>x.id===Number(id));await api('/api/mute/'+(a==='mute-author'?'author':'topic'),'POST',{value:a==='mute-author'?d.username:d.topic});toast('Muted');return render()}
 if(a==='unmute'){await api('/api/unmute/'+el.dataset.kind,'POST',{value:id});return render()}
 if(a==='schedule-draft'){await saveEdited(id);const card=el.closest('article');if(card.querySelector('.schedule-form'))return;const f=document.createElement('form');f.className='schedule-form notice';f.dataset.draft=id;f.innerHTML=input('Local date and time','due','','datetime-local','required')+'<p class="hint">Timezone: '+esc(Intl.DateTimeFormat().resolvedOptions().timeZone)+'. Keep the app running.</p><button type="submit">Schedule this approved post</button>';card.append(f);return}
-if(a==='edit-schedule'){composing=(await api('/api/drafts')).find(d=>d.id===Number(id));location.hash='compose';return render()}
+if(a==='edit-schedule'){composing=(await api('/api/drafts')).find(d=>d.id===Number(id));composingGenerated=composing?.generated_text||'';location.hash='compose';return render()}
 if(a==='cancel-schedule'){if(confirm('Cancel this scheduled post?'))await api('/api/schedule/'+id,'DELETE');return render()}
-if(a==='compose-review'){const d=await submitCompose($('#compose-form'));approvalTab=d.kind;composing=null;location.hash='approvals';return render()}
+if(a==='new-draft'){if($('#compose-form').elements.text.value.trim()&&!confirm('Start a new draft? Save any current changes first.'))return;composing=null;composingGenerated='';return render()}
+if(a==='compose-review'){const d=await submitCompose($('#compose-form'));approvalTab=d.kind;composing=null;composingGenerated='';location.hash='approvals';return render()}
 if(a==='compose-ai'){const f=$('#compose-form'),operation=$('[name="compose-operation"]').value,text=f.elements.text.value;if(!text.trim())throw Error('Write a brief or some text first.');const d=await api('/api/generate/compose','POST',{text,operation,kind:f.elements.kind.value});const suggestions=operation==='Generate 3 alternatives'?d.text.split(/\n\s*---\s*\n/):[d.text];$('#compose-suggestion').innerHTML=suggestions.map((s,i)=>'<div class="card"><div class="preview" id="suggestion-'+i+'">'+esc(s)+'</div>'+(operation!=='Check repetitive wording'?btn('Use this suggestion','use-suggestion',i):'')+'</div>').join('');return}
-if(a==='use-suggestion'){const f=$('#compose-form').elements.text;f.value=$('#suggestion-'+id).textContent;f.dispatchEvent(new Event('input',{bubbles:true}));return}
+if(a==='use-suggestion'){const f=$('#compose-form').elements.text;f.value=$('#suggestion-'+id).textContent;composingGenerated=f.value;f.dispatchEvent(new Event('input',{bubbles:true}));return}
 if(a==='resume-discovery'){await api('/api/discovery/resume','POST');config.monitoring=true;toast('Monitoring resumed; rate-limit backoff remains.');return render()}
 if(a==='edit-watch'){editingWatch=(await api('/api/watchlist')).find(x=>x.id===Number(id));return render()}
 if(a==='delete-watch'){if(confirm('Remove this watched account?'))await api('/api/watchlist/'+id,'DELETE');return render()}
@@ -41,3 +43,5 @@ if(a==='refresh-topic'){const d=await api('/api/topics/'+id+'/refresh','POST');t
 if(a==='topic-ai'){const f=$('#topic-form'),d=values(f);d.enabled=f.elements.enabled.checked;f.elements.query.value=(await api('/api/topics/suggest/query','POST',d)).query;return}
 }
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-action]');if(!b)return;b.disabled=true;try{await doAction(b.dataset.action,b.dataset.id,b)}catch(error){errorPanel(error)}finally{b.disabled=false}});
+
+document.addEventListener('click',e=>{const a=e.target.closest('a[target="_blank"]');if(a&&window.__XEA_DESKTOP__){e.preventDefault();openExternal(a.href)}});

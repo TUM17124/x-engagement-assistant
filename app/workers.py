@@ -53,7 +53,7 @@ async def scheduler_loop():
             await tick()
             db.set_setting("scheduler_state","Running")
         except Exception:
-            db.set_setting("scheduler_state","Problem ? review Schedule")
+            db.set_setting("scheduler_state","Problem - review Schedule")
         await asyncio.sleep(10)
 
 async def monitor_loop():

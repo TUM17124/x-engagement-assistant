@@ -28,6 +28,7 @@ fn main() {
             let handle=app.handle().clone();
             let nav_handle=handle.clone();
             WebviewWindowBuilder::new(app,"main",WebviewUrl::App("index.html".into()))
+                .initialization_script("window.__XEA_DESKTOP__ = true;")
                 .title("X Engagement Assistant").inner_size(1280.0,860.0).min_inner_size(760.0,600.0)
                 .on_navigation(move |url| {
                     let local=url.host_str()==Some("127.0.0.1") && url.port()==Some(8787);
@@ -35,6 +36,26 @@ fn main() {
                     let external=matches!(url.scheme(),"http"|"https") && ((!local && !internal) || url.path()=="/auth/login");
                     if external { let _=nav_handle.opener().open_url(url.as_str(),None::<&str>); return false; }
                     local || internal
+                })
+                .on_download(|webview,event| {
+                    match event {
+                        tauri::webview::DownloadEvent::Requested{url,destination} => {
+                            if url.host_str()!=Some("127.0.0.1") || url.port()!=Some(8787) || !url.path().starts_with("/api/export/") {return false;}
+                            let kind=url.path().rsplit('/').next().unwrap_or("export");
+                            if !["settings","drafts","history","database"].contains(&kind) {return false;}
+                            if let Ok(folder)=webview.app_handle().path().download_dir() {
+                                let ext=if kind=="database" {"sqlite3"} else {"json"};
+                                *destination=folder.join(format!("xea-{}-{}.{}",kind,uuid::Uuid::new_v4(),ext));
+                            } else {return false;}
+                        },
+                        tauri::webview::DownloadEvent::Finished{success,..} => {
+                            let message=if success {"Export saved to your Downloads folder."} else {"Export download failed. Please try again."};
+                            let script=format!("if(typeof toast==='function')toast({});",serde_json::to_string(message).unwrap());
+                            let _=webview.eval(&script);
+                        },
+                        _=>{}
+                    }
+                    true
                 })
                 .on_new_window({
                     let app=handle.clone();
@@ -51,7 +72,7 @@ fn main() {
             let quit=MenuItem::with_id(app,"quit","Quit (stops scheduling)",true,None::<&str>)?;
             let menu=Menu::with_items(app,&[&open,&pause,&resume,&quit])?;
             let tray=TrayIconBuilder::with_id("workspace").icon(app.default_window_icon().unwrap().clone())
-                .tooltip("X Engagement Assistant ? monitoring paused").menu(&menu)
+                .tooltip("X Engagement Assistant - monitoring paused").menu(&menu)
                 .on_menu_event(|app,event| {
                     match event.id.as_ref() {
                         "open" => {if let Some(w)=app.get_webview_window("main"){let _=w.show();let _=w.set_focus();}},
@@ -83,7 +104,7 @@ fn main() {
                             tray_enabled.store(enabled,Ordering::SeqCst);
                             if let Some(t)=handle.tray_by_id("workspace") {
                                 let _=t.set_visible(enabled);
-                                let label=if state["monitoring"].as_bool().unwrap_or(false) {"X Engagement Assistant ? monitoring enabled"} else {"X Engagement Assistant ? monitoring paused"};
+                                let label=if state["monitoring"].as_bool().unwrap_or(false) {"X Engagement Assistant - monitoring enabled"} else {"X Engagement Assistant - monitoring paused"};
                                 let _=t.set_tooltip(Some(label));
                             }
                         }
@@ -112,7 +133,8 @@ fn main() {
             let state=handle.state::<Backend>();
             let _=client().post("http://127.0.0.1:8787/desktop/shutdown").header("X-Desktop-Token",&state.token).send();
             std::thread::sleep(Duration::from_millis(700));
-            if let Some(child)=state.child.lock().unwrap().take(){let _=child.kill();}
+            let child = state.child.lock().unwrap().take();
+            if let Some(child) = child { let _ = child.kill(); }
         }
     });
 }

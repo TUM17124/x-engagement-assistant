@@ -58,6 +58,7 @@ class SecureConfigurationTests(AppTest):
             value="private-dpapi-test-value"
             store.set("key",value)
             self.assertEqual(store.get("key"),value)
+            self.assertEqual(store.masked("key"),"\u2022"*12+"alue")
             self.assertNotIn(value.encode(),next(Path(folder).glob("*.bin")).read_bytes())
             store.delete("key")
             self.assertEqual(store.get("key"),"")

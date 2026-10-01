@@ -21,6 +21,7 @@ class DraftInput(BaseModel):
     kind: str
     text: str = Field(max_length=20000)
     feed_id: str | None = None
+    generated_text: str = Field(default="",max_length=20000)
 
 class ReplyInput(BaseModel):
     feed_id: str
@@ -61,7 +62,7 @@ def dashboard():
     generated=db.one("SELECT COUNT(*) n FROM drafts WHERE generated_text<>''")["n"]
     accepted=db.one("SELECT COUNT(DISTINCT a.draft_id) n FROM activity a JOIN drafts d ON a.draft_id=d.id WHERE a.action='approved' AND d.generated_text<>''")["n"]
     return {"profile":db.get_setting("x_profile"),"x_connected":bool(load_tokens()),
-        "ai_health":db.get_setting("ai_health"),"provider":prefs.get("ai_provider"),"model":prefs.get("ai_model"),
+        "x_health":db.get_setting("x_health"),"ai_health":db.get_setting("ai_health"),"provider":prefs.get("ai_provider"),"model":prefs.get("ai_model"),
         "scheduler":db.get_setting("scheduler_state","Stopped"),"today_writes":action_count_today(),
         "drafts":counts,"published":published,"approved":approved,"generated":generated,
         "acceptance_rate":round(accepted/generated*100,1) if generated else None,
@@ -114,11 +115,11 @@ def drafts(kind: str=""):
 
 @router.post("/drafts")
 def create_draft(data: DraftInput):
-    return ws.save_draft(data.kind,data.text,data.feed_id)
+    return ws.save_draft(data.kind,data.text,data.feed_id,generated=data.generated_text)
 
 @router.put("/drafts/{draft_id}")
 def edit_draft(draft_id: int,data: DraftInput):
-    return ws.save_draft(data.kind,data.text,data.feed_id,draft_id=draft_id)
+    return ws.save_draft(data.kind,data.text,data.feed_id,generated=data.generated_text,draft_id=draft_id)
 
 @router.post("/generate/reply")
 async def generate_reply(data: ReplyInput):
@@ -329,3 +330,12 @@ async def restore(file: UploadFile=File(...)):
 def import_settings(data: dict):
     prefs.save(data)
     return {"ok":True}
+
+@router.post("/import/legacy")
+async def import_legacy(file: UploadFile=File(...)):
+    from .legacy import import_legacy
+    data=await file.read(20*1024*1024+1)
+    if len(data)>20*1024*1024:
+        raise ValueError("Maximum legacy database size is 20 MB.")
+    async with ws.WRITE_LOCK:
+        return import_legacy(data)

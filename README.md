@@ -32,7 +32,7 @@ You can skip X API connection and use manual discovery/replies. An AI endpoint i
 
 ## Discovery: paid API or free web search
 
-**Settings ? X Connection ? Discovery Mode**
+**Settings -> X Connection -> Discovery Mode**
 
 | Mode | Behavior |
 | --- | --- |
@@ -40,7 +40,7 @@ You can skip X API connection and use manual discovery/replies. An AI endpoint i
 | X API Search | Uses `GET /2/tweets/search/recent` with your bearer token or OAuth credentials; results enter Feed. Access errors still offer a manual fallback. |
 | X Web Search | Opens X.com search; no paid API search request is made. Paste a post back into Feed. |
 
-Queries support boolean operators, language and author filters, exclusion of retweets/replies, and 10?100 maximum results. Returned author information and public metrics are displayed when provided.
+Queries support boolean operators, language and author filters, exclusion of retweets/replies, and 10-100 maximum results. Returned author information and public metrics are displayed when provided.
 
 The app shows API search availability, searches today, and posts retrieved today. A 402 is remembered: it is **not repeatedly retried**. After fixing access, use **Retest search access on next search**. Rate-limit backoff remains in force. No dollar-cost estimates are fabricated.
 
@@ -85,6 +85,8 @@ Windows data lives in `%LOCALAPPDATA%\XEngagementAssistant`. SQLite stores works
 
 Drafting sends source text and author plus your chosen writing/product context to your configured AI endpoint. Cloud AI is not local inference. API discovery and publishing communicate with X. See [secure configuration](docs/SECURITY.md).
 
+To migrate the original developer app, use **Settings -> Data & Backup -> Migrate the original developer app** and select its engagement.db. History and available OAuth tokens are imported without overwriting an existing login. Keep the original file private; it may contain old plaintext tokens.
+
 ## Service limitations
 
 X API read/write access, credits, rate limits, and reply permissions are controlled by X. AI access and credits are controlled by your AI provider. The app explains errors and offers manual discovery/reply alternatives; it does not bypass restrictions.
@@ -105,7 +107,7 @@ py -m venv .venv
 pip install -r requirements-build.txt
 npm ci
 git config core.hooksPath .githooks
-uvicorn app.main:app --host 127.0.0.1 --port 8787 --reload
+uvicorn app.main:app --host 127.0.0.1 --port 8787 --reload --no-access-log
 ```
 
 Open localhost:8787 for browser development. Configure in the UI. `.env` is optional for developers and is never loaded by packaged builds.
@@ -117,6 +119,7 @@ python scripts/make_icons.py
 python scripts/build_backend.py
 npm run desktop:dev
 # Close the development app, then:
+python scripts/collect_notices.py
 npm run desktop:build
 ```
 

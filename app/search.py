@@ -37,7 +37,7 @@ def status():
 
 async def recent_search(query,max_results=20,topic=""):
     if not 10<=max_results<=100:
-        raise ValueError("Choose 10?100 maximum results.")
+        raise ValueError("Choose 10-100 maximum results.")
     fallback={"query":query,"web_url":web_search(query),"items":[],"mode":"web"}
     if prefs.get("discovery_mode")=="web":
         return {**fallback,"message":"X Web Search selected. Open Search on X, then import a post."}
@@ -61,10 +61,13 @@ async def recent_search(query,max_results=20,topic=""):
             if error.status==429:
                 db.set_setting("read_backoff_until",(datetime.now(timezone.utc)+timedelta(seconds=error.retry_after)).isoformat())
             return {**fallback,"message":str(error),"technical":f"X HTTP {error.status}"}
+        except RuntimeError:
+            db.execute("UPDATE search_usage SET status='authentication_required' WHERE id=?",(attempt,))
+            return {**fallback,"message":"Connect X or add a read bearer token in Settings. You can use X web search meanwhile."}
         records=payload.get("data",[])
         db.execute("UPDATE search_usage SET retrieved=?,status='success' WHERE id=?",(len(records),attempt))
         db.set_setting("search_access","Available")
         items=ingest(payload,"API search",topic)
         ids=[p["id"] for p in records]
         return {"mode":"api","items":items,"ids":ids,"retrieved":len(records),"query":query,
-                "web_url":web_search(query),"message":f"X API Search: Available ? {len(records)} posts retrieved."}
+                "web_url":web_search(query),"message":f"X API Search: Available - {len(records)} posts retrieved."}

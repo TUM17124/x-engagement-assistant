@@ -26,8 +26,8 @@ class AIProvider(ABC):
     async def health_check(self): ...
 
     async def generate_reply(self, source, style="", rank=False):
-        profile = {"voice": prefs.get("voice"), "product": prefs.get("product")}
-        system = ANTI_BOT + "\nOptional truthful context: " + json.dumps(profile)
+        profile = {"voice": prefs.get("voice"), "product": prefs.get("product"), "interests": prefs.get("interests")}
+        system = ANTI_BOT + "\nIf current_draft is supplied, revise that draft in the requested style while staying specific to the source.\nOptional truthful context: " + json.dumps(profile)
         if rank:
             system += '\nReturn JSON only: {"reply":"... or SKIP","reason":"specific reason","score":0,"topic":"..."}; score is relevance 0-100, not a performance prediction.'
         return await self.complete(system, json.dumps({"source": source, "requested_style": style}))

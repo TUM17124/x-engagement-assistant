@@ -80,6 +80,6 @@ class SecretStore:
 
     def masked(self, name):
         value = self.get(name)
-        return ("????????????" + value[-4:]) if len(value) > 4 else ("????????" if value else "")
+        return ("\u2022" * 12 + value[-4:]) if len(value) > 4 else ("\u2022" * 8 if value else "")
 
 store = SecretStore()

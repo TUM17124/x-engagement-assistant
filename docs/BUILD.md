@@ -12,7 +12,8 @@ See [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) and [Window
 2. Run `npm ci`.
 3. Run `python scripts/make_icons.py`.
 4. Run `python scripts/build_backend.py`.
-5. Run `npm run desktop:build`.
+5. Run `python scripts/collect_notices.py
+npm run desktop:build`.
 
 The backend step creates a self-contained sidecar named `src-tauri/binaries/xea-backend-x86_64-pc-windows-msvc.exe`. No system Python is needed by the resulting installer.
 
@@ -28,7 +29,7 @@ The Windows desktop workflow runs Python tests, UI checks and a secret scan, bun
 
 The installer is per-user and includes application shortcuts and a standard Windows uninstaller. WebView2's bootstrapper runs only if needed. The app does not register startup tasks or services.
 
-Uninstall through Windows Settings ? Apps. The program and shortcuts are removed. Workspace data is retained by default to prevent accidental loss; after exporting anything you need, remove `%LOCALAPPDATA%\XEngagementAssistant` to delete the database and DPAPI-encrypted credentials. Credentials from this directory are bound to that Windows user.
+Uninstall through Windows Settings -> Apps. The program and shortcuts are removed. The uninstaller asks whether to delete workspace data and credentials; No is the default. After exporting anything you need, you can also remove `%LOCALAPPDATA%\XEngagementAssistant` to delete the database and DPAPI-encrypted credentials. Credentials from this directory are bound to that Windows user.
 
 Do not sign releases with a key stored in the repository. Authenticode signing is a maintainer/release configuration step; unsigned development builds may trigger SmartScreen.
 

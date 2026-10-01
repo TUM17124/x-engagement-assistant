@@ -4,8 +4,7 @@
   "version": "0.2.0",
   "identifier": "org.xengagement.assistant",
   "build": {
-    "frontendDist": "../desktop",
-    "devUrl": "http://127.0.0.1:8787"
+    "frontendDist": "../desktop"
   },
   "app": {
     "windows": [],
@@ -36,12 +35,17 @@
         "languages": [
           "English"
         ],
-        "startMenuFolder": "X Engagement Assistant"
+        "startMenuFolder": "X Engagement Assistant",
+        "installerHooks": "installer-hooks.nsh"
       },
       "webviewInstallMode": {
         "type": "downloadBootstrapper",
         "silent": true
       }
+    },
+    "resources": {
+      "../docs/THIRD_PARTY_NOTICES.txt": "THIRD_PARTY_NOTICES.txt",
+      "../LICENSE": "LICENSE"
     }
   }
 }

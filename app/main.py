@@ -110,11 +110,18 @@ async def auth_callback(request: Request, code: str="",state: str="",error: str=
 @app.post("/auth/logout")
 def logout():
     clear_tokens()
+    db.set_setting("x_profile",None)
+    db.set_setting("x_health",None)
     return {"ok":True}
 
 @app.post("/api/health/x")
 async def test_x():
-    profile = await x_api.me()
+    try:
+        profile = await x_api.me()
+    except Exception:
+        db.set_setting("x_health", {"ok":False,"checked_at":db.now()})
+        raise
+    db.set_setting("x_health", {"ok":True,"checked_at":db.now()})
     db.set_setting("x_profile",profile)
     return {"ok":True,"profile":profile}
 

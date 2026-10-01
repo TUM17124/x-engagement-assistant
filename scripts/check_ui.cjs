@@ -15,7 +15,7 @@ if(esc('<img src=x onerror=alert(1)>').includes('<img'))throw Error('Escaping fa
 const d={id:1,kind:'reply',username:'test',status:'draft',text:'A reply',score:90,source_text:'<script>alert(1)</script>',reason:'Specific',topic:'PDF'};
 const html=draftCard(d);
 if(html.includes('<script>'))throw Error('Untrusted source was not escaped');
-if(!html.includes('Approve exact content')||!html.includes('Open manual reply'))throw Error('Approval workflow missing');
+if(!html.includes('Approve exact content')||!html.includes('Reply Manually on X'))throw Error('Approval workflow missing');
 if(!schedulePage([]).includes('Keep the app running'))throw Error('Scheduler limitation missing');
 if(!composePage().includes('Generate 3 alternatives'))throw Error('Composer tool missing');
 if(!topicsPage([]).includes('Suggest query with AI'))throw Error('Topic AI tool missing');

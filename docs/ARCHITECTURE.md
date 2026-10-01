@@ -26,13 +26,13 @@ The desktop shell holds an ephemeral control token passed through the sidecar en
 
 ## Approval state machine
 
-Draft ? approved ? explicit publish ? sending ? published.
+Draft -> approved -> explicit publish -> sending -> published.
 
 The approval fingerprint covers kind, target post and exact text. An edit removes approval and cancels its pending schedule. Draft generation has no publishing side effects. A scheduler only accepts original posts that retain the exact approved fingerprint.
 
 Sending is persisted before an external request. Ambiguous failures become uncertain; partially published threads become partial. Neither is automatically retried. API access failures are visible and require a human to review before another attempt.
 
-Scheduled originals: approved ? scheduled ? sending ? published. Missed startup deadlines become missed; interrupted sends become uncertain. A restored backup cannot restore publishing approval.
+Scheduled originals: approved -> scheduled -> sending -> published. Missed startup deadlines become missed; interrupted sends become uncertain. A restored backup cannot restore publishing approval.
 
 ## Limits and request protection
 

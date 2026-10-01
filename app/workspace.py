@@ -63,6 +63,8 @@ def save_draft(kind, text, feed_id=None, generated="", reason="", score=0, topic
         with db.conn() as c:
             c.execute("UPDATE drafts SET kind=?,text=?,feed_id=?,status='draft',updated_at=? WHERE id=?",
                       (kind,text,feed_id,db.now(),draft_id))
+            if generated:
+                c.execute("UPDATE drafts SET generated_text=?,provider=?,model=? WHERE id=?",(generated,prefs.get("ai_provider"),prefs.get("ai_model"),draft_id))
             c.execute("DELETE FROM approved_content WHERE draft_id=?",(draft_id,))
             c.execute("UPDATE scheduled_posts SET status='cancelled' WHERE draft_id=?",(draft_id,))
         return get_draft(draft_id)
@@ -88,8 +90,14 @@ async def generate_reply(feed_id, style="", draft_id=None):
         raise ValueError("Post is unavailable or ignored.")
     if db.one("SELECT 1 FROM muted_accounts WHERE username=?",(feed["username"].lower(),)) or db.one("SELECT 1 FROM muted_topics WHERE topic=?",(feed["topic"].lower(),)):
         raise ValueError("This author or topic is muted.")
-    result = await ai_call(lambda: provider().generate_reply(
-        {"text":feed["text"],"username":feed["username"],"topic":feed["topic"]},style,rank=True))
+    source = {"text":feed["text"],"username":feed["username"],"topic":feed["topic"]}
+    if draft_id:
+        current = get_draft(draft_id)
+        if current["feed_id"] != feed_id or current["status"] in {"sending","published","uncertain","partial"}:
+            raise ValueError("Choose an editable draft for this source.")
+        if style:
+            source["current_draft"] = current["text"]
+    result = await ai_call(lambda: provider().generate_reply(source,style,rank=True))
     clean = re.sub(r"^\`\`\`(?:json)?\s*|\s*\`\`\`$", "", result.strip())
     try:
         data = json.loads(clean)
@@ -118,7 +126,7 @@ async def generate_reply(feed_id, style="", draft_id=None):
 def parts(draft):
     values = [p.strip() for p in draft["text"].split("\n---\n")] if draft["kind"] == "thread" else [draft["text"].strip()]
     if not 1 <= len(values) <= 10 or any(not p or len(p)>280 for p in values):
-        raise ValueError("Each post must contain 1?280 characters. Threads support up to 10 posts separated by a line containing ---.")
+        raise ValueError("Each post must contain 1-280 characters. Threads support up to 10 posts separated by a line containing ---.")
     return values
 
 def safety(draft):
@@ -215,7 +223,10 @@ def schedule(draft_id, due_at, timezone_name):
     due = datetime.fromisoformat(due_at.replace("Z","+00:00"))
     if due.tzinfo is None or due <= datetime.now(timezone.utc):
         raise ValueError("Choose a future time with a timezone.")
-    ZoneInfo(timezone_name)
+    try:
+        ZoneInfo(timezone_name)
+    except (KeyError,ValueError):
+        raise ValueError("Choose a valid local timezone.") from None
     db.execute("""INSERT INTO scheduled_posts(draft_id,content_hash,due_at,timezone,status) VALUES(?,?,?,?,'pending')
      ON CONFLICT(draft_id) DO UPDATE SET content_hash=excluded.content_hash,due_at=excluded.due_at,
      timezone=excluded.timezone,status='pending',error='',notified=0""",

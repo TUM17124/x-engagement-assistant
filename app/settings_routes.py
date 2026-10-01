@@ -25,6 +25,9 @@ def replace_secret(name: str, value: SecretInput):
     if name not in PUBLIC_SECRET_NAMES:
         raise HTTPException(404, "Unknown credential.")
     store.set(secret_name(name), value.value.strip())
+    if name == "ai_api_key":
+        from .database import set_setting
+        set_setting("ai_health",None)
     return {"masked": store.masked(secret_name(name))}
 
 @router.delete("/secrets/{name}")
