@@ -1,0 +1,14 @@
+{
+  "name": "x-engagement-assistant",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Approval-first local X engagement desktop workspace",
+  "scripts": {
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
+    "check:ui": "node scripts/check_ui.cjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.10.0"
+  }
+}
