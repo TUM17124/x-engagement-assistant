@@ -14,7 +14,7 @@ def authorize(request):
 @router.get("/state")
 def state(request:Request):
     authorize(request)
-    return {"tray_enabled":prefs.get("tray_enabled"),"monitoring":prefs.get("monitoring"),
+    return {"tray_enabled":prefs.get("tray_enabled"),"monitoring":prefs.get("monitoring") or prefs.get("assistant_mode"),
             "notifications":prefs.get("notifications")}
 
 @router.get("/events")
@@ -31,7 +31,7 @@ def events(request:Request):
 @router.post("/monitoring/{enabled}")
 def monitoring(request:Request,enabled:bool):
     authorize(request)
-    prefs.save({"monitoring":enabled})
+    prefs.save({"monitoring":enabled,"assistant_mode":enabled})
     return {"ok":True}
 
 @router.post("/shutdown")

@@ -20,6 +20,10 @@ async def tick():
                 if not c.execute("UPDATE scheduled_posts SET status='sending' WHERE id=? AND status='pending'",(item["id"],)).rowcount:
                     continue
             try:
+                if item.get("delivery")=="manual":
+                    db.execute("UPDATE scheduled_posts SET status='reminder',error='Ready for manual publishing. Nothing was sent.' WHERE id=?",(item["id"],))
+                    notify("An approved social post is ready for manual publishing.")
+                    continue
                 draft=get_draft(item["draft_id"])
                 if item["content_hash"] != content_hash(draft):
                     raise ValueError("Content changed after scheduling. Approve and schedule again.")
@@ -59,6 +63,11 @@ async def scheduler_loop():
 async def monitor_loop():
     while True:
         await monitor()
+        try:
+            from .social.workspace import monitor as social_monitor
+            await social_monitor()
+        except Exception:
+            pass
         await asyncio.sleep(60)
 
 async def run_workers():

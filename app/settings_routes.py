@@ -28,6 +28,7 @@ def replace_secret(name: str, value: SecretInput):
     if name == "ai_api_key":
         from .database import set_setting
         set_setting("ai_health",None)
+        set_setting("ai_pause",{})
     return {"masked": store.masked(secret_name(name))}
 
 @router.delete("/secrets/{name}")

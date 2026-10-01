@@ -26,7 +26,7 @@ class AIProvider(ABC):
     async def health_check(self): ...
 
     async def generate_reply(self, source, style="", rank=False):
-        profile = {"voice": prefs.get("voice"), "product": prefs.get("product"), "interests": prefs.get("interests")}
+        profile = {"voice": prefs.get("voice"), "product": prefs.get("product"), "interests": prefs.get("interests"), "my_profile": prefs.get("my_profile"), "brand_voice": prefs.get("brand_voice")}
         system = ANTI_BOT + "\nIf current_draft is supplied, revise that draft in the requested style while staying specific to the source.\nOptional truthful context: " + json.dumps(profile)
         if rank:
             system += '\nReturn JSON only: {"reply":"... or SKIP","reason":"specific reason","score":0,"topic":"..."}; score is relevance 0-100, not a performance prediction.'
@@ -36,7 +36,7 @@ class AIProvider(ABC):
         return await self.complete(ANTI_BOT + "\nWrite original content using only the supplied facts. " +
             "Do not return SKIP for a valid original brief. For a thread separate posts with a line containing ---. " +
             "Each post must be at most 280 characters. Voice and product: " +
-            json.dumps({"voice": prefs.get("voice"), "product": prefs.get("product")}),
+            json.dumps({"voice": prefs.get("voice"), "product": prefs.get("product"), "my_profile":prefs.get("my_profile"), "brand_voice":prefs.get("brand_voice")}),
             json.dumps({"brief": brief, "mode": mode}))
 
     async def rewrite(self, text, instruction):

@@ -5,6 +5,9 @@ from . import database as db
 from .secrets import store, PUBLIC_SECRET_NAMES
 
 DEFAULTS = {
+    "assistant_mode": False, "social_daily_request_cap": 100, "social_max_feed": 200,
+    "my_profile": {}, "brand_voice": {}, "image_provider": {},
+    "notify_priority": True, "notify_mentions": True, "notify_connections": True,
     "x_client_id": "", "x_redirect_uri": "http://127.0.0.1:8787/auth/callback",
     "ai_provider": "gemini", "ai_model": "gemini-2.5-flash", "ai_base_url": "",
     "discovery_mode": "automatic", "daily_search_limit": 20,
@@ -15,7 +18,7 @@ DEFAULTS = {
     "never_auto_reply": True, "require_approval": True,
     "voice": {}, "product": {}, "default_query": '("PDF editor" OR ebook) lang:en -is:retweet',
 }
-BOUNDS = {"daily_search_limit": (1, 1000),"daily_reply_limit": (1, 1000), "daily_post_limit": (1, 1000),
+BOUNDS = {"social_daily_request_cap": (1,1000), "social_max_feed": (20,1000),"daily_search_limit": (1, 1000),"daily_reply_limit": (1, 1000), "daily_post_limit": (1, 1000),
           "daily_write_cap": (1, 1000), "hourly_write_limit": (1, 100),
           "daily_ai_limit": (1, 1000), "same_account_limit": (1, 20), "poll_minutes": (15, 1440)}
 
@@ -67,6 +70,7 @@ def save(values, persist=True):
         for key, value in checked.items():
             if key in {"ai_provider","ai_model","ai_base_url"} and get(key) != value:
                 db.set_setting("ai_health",None)
+                db.set_setting("ai_pause",{})
             db.set_setting(key, value)
 
 def bootstrap_dev_env():

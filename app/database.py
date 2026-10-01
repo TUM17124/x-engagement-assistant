@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from .paths import data_dir
 
 DB_PATH = data_dir() / "workspace.sqlite3"
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 6
 MIGRATIONS = [
 """
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -53,6 +53,41 @@ CREATE INDEX activity_target ON activity(target_account, timestamp);
 ]
 
 MIGRATIONS.append("CREATE TABLE search_usage (id INTEGER PRIMARY KEY, created_at TEXT NOT NULL, retrieved INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL);")
+
+MIGRATIONS.append("""
+ALTER TABLE feed_items ADD COLUMN platform TEXT NOT NULL DEFAULT 'x';
+ALTER TABLE feed_items ADD COLUMN external_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE feed_items ADD COLUMN url TEXT NOT NULL DEFAULT '';
+ALTER TABLE feed_items ADD COLUMN content_kind TEXT NOT NULL DEFAULT 'post';
+ALTER TABLE feed_items ADD COLUMN priority INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE feed_items ADD COLUMN reason TEXT NOT NULL DEFAULT '';
+ALTER TABLE feed_items ADD COLUMN analyzed INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE feed_items ADD COLUMN media_json TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE drafts ADD COLUMN platform TEXT NOT NULL DEFAULT 'x';
+ALTER TABLE drafts ADD COLUMN account_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE drafts ADD COLUMN media_ids TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE drafts ADD COLUMN quality TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE activity ADD COLUMN platform TEXT NOT NULL DEFAULT 'x';
+ALTER TABLE scheduled_posts ADD COLUMN delivery TEXT NOT NULL DEFAULT 'api';
+CREATE TABLE social_accounts(platform TEXT PRIMARY KEY,account_id TEXT NOT NULL,name TEXT NOT NULL,
+ avatar TEXT NOT NULL DEFAULT '',permissions TEXT NOT NULL DEFAULT '',last_sync TEXT,api_status TEXT NOT NULL DEFAULT '');
+CREATE TABLE social_usage(id INTEGER PRIMARY KEY,platform TEXT NOT NULL,operation TEXT NOT NULL,created_at TEXT NOT NULL,status TEXT NOT NULL);
+CREATE TABLE social_watch(id INTEGER PRIMARY KEY,platform TEXT NOT NULL,handle TEXT NOT NULL,url TEXT NOT NULL,
+ category TEXT NOT NULL DEFAULT 'favorite',priority TEXT NOT NULL DEFAULT 'Normal',topics TEXT NOT NULL DEFAULT '',
+ enabled INTEGER NOT NULL DEFAULT 1,notifications INTEGER NOT NULL DEFAULT 0,auto_draft INTEGER NOT NULL DEFAULT 0,
+ last_checked TEXT,next_check TEXT,last_seen_id TEXT,error TEXT NOT NULL DEFAULT '',UNIQUE(platform,handle,category));
+CREATE TABLE social_mutes(platform TEXT NOT NULL,author TEXT NOT NULL,PRIMARY KEY(platform,author));
+CREATE TABLE ideas(id INTEGER PRIMARY KEY,title TEXT NOT NULL,text TEXT NOT NULL,url TEXT NOT NULL DEFAULT '',
+ kind TEXT NOT NULL DEFAULT 'thought',created_at TEXT NOT NULL);
+CREATE TABLE media(id TEXT PRIMARY KEY,name TEXT NOT NULL,mime TEXT NOT NULL,size INTEGER NOT NULL,width INTEGER,height INTEGER,
+ created_at TEXT NOT NULL,tags TEXT NOT NULL DEFAULT '',folder TEXT NOT NULL DEFAULT '',favorite INTEGER NOT NULL DEFAULT 0,
+ caption TEXT NOT NULL DEFAULT '',alt_text TEXT NOT NULL DEFAULT '',parent_id TEXT);
+CREATE TABLE media_usage(id INTEGER PRIMARY KEY,media_id TEXT NOT NULL,draft_id INTEGER NOT NULL,used_at TEXT NOT NULL);
+CREATE INDEX social_feed_platform ON feed_items(platform,imported_at);
+CREATE INDEX social_usage_date ON social_usage(platform,created_at);
+""")
+
+MIGRATIONS.append("ALTER TABLE actions ADD COLUMN platform TEXT NOT NULL DEFAULT 'x'; DELETE FROM approved_content; UPDATE drafts SET status='draft' WHERE status IN ('approved','scheduled'); UPDATE scheduled_posts SET status='cancelled',error='Reapprove after the multi-social upgrade.' WHERE status='pending';")
 
 def now():
     return datetime.now(timezone.utc).isoformat()

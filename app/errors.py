@@ -6,7 +6,7 @@ class ServiceError(RuntimeError):
         messages = {
             401: f"Your {service} credentials are invalid or expired. Reconnect or replace the key in Settings.",
             402: ("Your current X API project does not have credits/access for this endpoint." if service == "X"
-                  else "Your AI provider needs credits or billing access. Check your provider account."),
+                  else f"Your {service} provider needs credits or billing access. Check your provider account."),
             403: f"Your {service} account does not have permission for this action.",
             429: f"{service} rate limit reached. Requests are paused until the limit resets.",
         }

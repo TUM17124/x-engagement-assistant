@@ -9,7 +9,7 @@ from .paths import data_dir
 
 _LOCK = threading.RLock()
 SERVICE = "org.xengagement.assistant"
-PUBLIC_SECRET_NAMES = {"x_client_secret", "x_bearer_token", "ai_api_key"}
+PUBLIC_SECRET_NAMES = {"x_client_secret", "x_bearer_token", "ai_api_key", "image_api_key"}
 
 class SecretStore:
     def __init__(self, directory=None):

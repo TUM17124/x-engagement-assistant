@@ -17,9 +17,9 @@ def clear_tokens():
     store.delete("oauth_tokens")
     db.set_setting("x_profile", None)
 
-def log_action(action_type, text, target_id=None):
-    db.execute("INSERT INTO actions(action_type,target_id,text,created_at) VALUES(?,?,?,?)",
-               (action_type, target_id, text, db.now()))
+def log_action(action_type, text, target_id=None,platform='x'):
+    db.execute("INSERT INTO actions(action_type,target_id,text,created_at,platform) VALUES(?,?,?,?,?)",
+               (action_type, target_id, text, db.now(),platform))
 
 def action_count_today():
     return db.one("SELECT COUNT(*) n FROM actions WHERE substr(created_at,1,10)=?", (db.now()[:10],))["n"]

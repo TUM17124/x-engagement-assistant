@@ -128,6 +128,7 @@ async def test_x():
 @app.post("/api/health/ai")
 async def test_ai():
     from .providers import provider
+    db.set_setting("ai_pause",{})
     try:
         await provider().health_check()
     except Exception:
@@ -143,3 +144,14 @@ app.include_router(search_router)
 
 from .desktop_control import router as desktop_router
 app.include_router(desktop_router)
+
+from .social.routes import router as social_router
+app.include_router(social_router)
+
+from .social.content_routes import router as social_content_router
+from .media_routes import router as media_router
+app.include_router(social_content_router)
+app.include_router(media_router)
+
+from .social.privacy import router as privacy_router
+app.include_router(privacy_router)

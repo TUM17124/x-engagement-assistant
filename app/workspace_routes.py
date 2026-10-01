@@ -192,7 +192,7 @@ def unmute(kind: str,data: dict):
 
 @router.get("/schedule")
 def schedules():
-    return db.rows("SELECT s.*,d.text,d.status draft_status FROM scheduled_posts s JOIN drafts d ON s.draft_id=d.id ORDER BY s.due_at")
+    return db.rows("SELECT s.*,d.text,d.platform,d.status draft_status FROM scheduled_posts s JOIN drafts d ON s.draft_id=d.id ORDER BY s.due_at")
 
 @router.post("/drafts/{draft_id}/schedule")
 def schedule(draft_id: int,data: ScheduleInput):
