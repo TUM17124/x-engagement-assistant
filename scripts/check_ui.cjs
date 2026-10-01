@@ -1,11 +1,12 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert'),path=require('path');
-const files=['app','settings','feed','screens','actions','forms'];
+const files=['app','settings','feed','screens','actions','accounts','social','social-actions','forms'];
 for(const file of files)new vm.Script(fs.readFileSync(path.join('app/static',file+'.js'),'utf8'),{filename:file+'.js'});
 const context={console,URLSearchParams,FormData,Date,setTimeout,clearTimeout,
 document:{addEventListener(){},querySelector(){return null}},window:{addEventListener(){}},location:{hash:''}};
 vm.createContext(context);
 for(const file of files.slice(0,-1))vm.runInContext(fs.readFileSync(path.join('app/static',file+'.js'),'utf8'),context);
 vm.runInContext(`
+settingsTab='x';
 config={ai_provider:'gemini',ai_model:'test-model',interests:[],theme:'dark',default_query:'PDF',discovery_mode:'automatic',daily_search_limit:20};
 if(!settingsPage({authors:[],topics:[]}).includes('Discovery Mode'))throw Error('Discovery Mode missing');
 if(!settingsPage({authors:[],topics:[]}).includes('daily_search_limit'))throw Error('Search cap missing');

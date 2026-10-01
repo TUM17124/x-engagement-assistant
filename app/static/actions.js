@@ -1,4 +1,6 @@
 async function doAction(a,id,el){
+if(a.startsWith('ms-'))return msAction(a.slice(3),id,el);
+if(a.startsWith('social-'))return socialAccountAction(a,id);
 if(a==='onboard-back'){onStep--;wizard();return}
 if(a==='reveal'){const d=await api('/api/secrets/'+id+'/reveal','POST'),target=$('#mask-'+id);target.textContent=d.value;setTimeout(()=>{if(target.isConnected)target.textContent=secretMasks[id]||'Not saved'},15000);return}
 if(a==='delete-secret'){if(!confirm('Delete this saved credential?'))return;await api('/api/secrets/'+id,'DELETE');secretMasks[id]='';$('#mask-'+id).textContent='Not saved';toast('Credential deleted');return}
@@ -27,7 +29,8 @@ if(a==='regenerate'){const d=await saveEdited(id),style=$('#style-'+id).value;aw
 if(a==='mute-author'||a==='mute-topic'){const d=draftCache.find(x=>x.id===Number(id));await api('/api/mute/'+(a==='mute-author'?'author':'topic'),'POST',{value:a==='mute-author'?d.username:d.topic});toast('Muted');return render()}
 if(a==='unmute'){await api('/api/unmute/'+el.dataset.kind,'POST',{value:id});return render()}
 if(a==='schedule-draft'){await saveEdited(id);const card=el.closest('article');if(card.querySelector('.schedule-form'))return;const f=document.createElement('form');f.className='schedule-form notice';f.dataset.draft=id;f.innerHTML=input('Local date and time','due','','datetime-local','required')+'<p class="hint">Timezone: '+esc(Intl.DateTimeFormat().resolvedOptions().timeZone)+'. Keep the app running.</p><button type="submit">Schedule this approved post</button>';card.append(f);return}
-if(a==='edit-schedule'){composing=(await api('/api/drafts')).find(d=>d.id===Number(id));composingGenerated=composing?.generated_text||'';location.hash='compose';return render()}
+if(a==='edit-schedule'){inboxTab='scheduled';location.hash='queue';return render()}
+if(a==='legacy-edit-schedule'){composing=(await api('/api/drafts')).find(d=>d.id===Number(id));composingGenerated=composing?.generated_text||'';location.hash='compose';return render()}
 if(a==='cancel-schedule'){if(confirm('Cancel this scheduled post?'))await api('/api/schedule/'+id,'DELETE');return render()}
 if(a==='new-draft'){if($('#compose-form').elements.text.value.trim()&&!confirm('Start a new draft? Save any current changes first.'))return;composing=null;composingGenerated='';return render()}
 if(a==='compose-review'){const d=await submitCompose($('#compose-form'));approvalTab=d.kind;composing=null;composingGenerated='';location.hash='approvals';return render()}

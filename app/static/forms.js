@@ -1,5 +1,7 @@
 async function submit(f){
 const d=values(f);
+if(isSocialForm(f))return msSubmit(f);
+if(f.classList.contains('social-account-form')||f.classList.contains('social-callback-form'))return socialAccountSubmit(f);
 if(f.id==='onboarding-form'){
  if(onStep===1)await saveX(f);
  if(onStep===2)await saveAI(f);
@@ -19,7 +21,7 @@ if(f.id==='x-form')await saveX(f);
 if(f.id==='ai-form')await saveAI(f);
 if(f.id==='safety-form')await saveSafety(f);
 if(f.id==='profile-form'){const type=f.dataset.type;await api('/api/settings','PUT',{[type]:d});config[type]=d}
-if(f.id==='appearance-form'){const next={theme:d.theme,notifications:f.elements.notifications.checked,tray_enabled:f.elements.tray_enabled.checked};await api('/api/settings','PUT',next);Object.assign(config,next)}
+if(f.id==='appearance-form'){const next={theme:d.theme,notifications:f.elements.notifications.checked,notify_priority:f.elements.notify_priority.checked,notify_mentions:f.elements.notify_mentions.checked,notify_connections:f.elements.notify_connections.checked,tray_enabled:f.elements.tray_enabled.checked};await api('/api/settings','PUT',next);Object.assign(config,next)}
 if(f.id==='discovery-form'){const next={discovery_mode:d.discovery_mode,daily_search_limit:Number(d.daily_search_limit),read_access:f.elements.read_access.checked,monitoring:f.elements.monitoring.checked,poll_minutes:Number(d.poll_minutes)};await api('/api/settings','PUT',next);Object.assign(config,next)}
 if(f.id==='restore-form'){if(!confirm('Replace your workspace with this backup? Export the current workspace first if needed. Restored schedules will not publish automatically.'))return;const result=await api('/api/restore','POST',new FormData(f));toast(result.note);config=(await api('/api/settings')).settings;return render()}
 if(f.id==='legacy-form'){const result=await api('/api/import/legacy','POST',new FormData(f));toast(result.note);return render()}
