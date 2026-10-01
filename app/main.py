@@ -1,196 +1,138 @@
-import re
+import asyncio
+from contextlib import asynccontextmanager
+import secrets
 from urllib.parse import quote
-
 import httpx
-
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from .config import settings
-from .storage import (
-    init_db, load_tokens, clear_tokens, log_action,
-    action_count_today, duplicate_recent, recent_actions
-)
-from . import x_api
-from .drafting import draft_reply
+from .paths import resources, VERSION
+from . import database as db, preferences as prefs, x_api
+from .storage import load_tokens, clear_tokens
+from .settings_routes import router as settings_router
+from .security import LocalSecurityMiddleware
+from .errors import ServiceError
 from .post_urls import parse_tweet_url
 
-app = FastAPI(title="X Engagement Assistant")
-app.add_middleware(SessionMiddleware, secret_key=settings.session_secret)
-templates = Jinja2Templates(directory="app/templates")
-
-@app.on_event("startup")
-def startup():
-    init_db()
-
-def ctx(request: Request, **extra):
-    base = {
-        "request": request,
-        "connected": bool(load_tokens()),
-        "today_count": action_count_today(),
-        "daily_cap": settings.daily_write_cap,
-        "actions": recent_actions(),
-        "default_query": settings.default_query,
-    }
-    base.update(extra)
-    return base
-
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    profile = None
-    error = None
-    if load_tokens():
+@asynccontextmanager
+async def lifespan(app):
+    db.init_db()
+    prefs.bootstrap_dev_env()
+    task = None
+    try:
+        from .workers import run_workers
+        task = asyncio.create_task(run_workers())
+    except ImportError:
+        pass
+    yield
+    if task:
+        task.cancel()
         try:
-            profile = await x_api.me()
-        except Exception as e:
-            error = str(e)
-    return templates.TemplateResponse("index.html", ctx(request, profile=profile, error=error))
+            await task
+        except asyncio.CancelledError:
+            pass
+
+app = FastAPI(title="X Engagement Assistant", version=VERSION, lifespan=lifespan)
+app.add_middleware(LocalSecurityMiddleware)
+app.add_middleware(SessionMiddleware, secret_key=settings.session_secret, same_site="lax")
+templates = Jinja2Templates(directory=str(resources() / "templates"))
+app.mount("/static", StaticFiles(directory=str(resources() / "static")), name="static")
+app.include_router(settings_router)
+
+@app.exception_handler(RuntimeError)
+async def runtime_error(request, error):
+    return JSONResponse({"error": "The action could not be completed. Check your connection and settings."}, status_code=400)
+
+@app.exception_handler(ValueError)
+async def invalid(request, error):
+    return JSONResponse({"error":str(error)},status_code=400)
+
+@app.exception_handler(ServiceError)
+async def service_error(request, error):
+    return JSONResponse(error.details(),status_code=502)
+
+@app.exception_handler(httpx.HTTPError)
+async def network_error(request, error):
+    # Never echo provider response bodies, request headers or credentials.
+    return JSONResponse({"error":"Connection failed. Test the connection in Settings."},status_code=502)
+
+@app.get("/health")
+def health():
+    return {"ok":True,"version":VERSION}
+
+@app.get("/",response_class=HTMLResponse)
+def home(request: Request):
+    request.session.setdefault("csrf", secrets.token_urlsafe(32))
+    return templates.TemplateResponse(request=request, name="desktop.html", context={"version":VERSION})
+
+@app.get("/api/bootstrap")
+def bootstrap(request: Request):
+    request.session.setdefault("csrf", secrets.token_urlsafe(32))
+    return {"csrf":request.session["csrf"],"version":VERSION,"settings":prefs.all_settings(),
+            "profile":db.get_setting("x_profile"),"connected":bool(load_tokens())}
+
+@app.get("/parse-tweet-url")
+def parse_url(tweet_url: str=""):
+    return parse_tweet_url(tweet_url)
 
 @app.get("/auth/login")
 async def auth_login(request: Request):
     if not settings.x_client_id:
-        return RedirectResponse("/?error=Missing+X_CLIENT_ID", status_code=302)
+        return RedirectResponse("/?error=Add+your+X+Client+ID+in+Settings",status_code=302)
     verifier, challenge = x_api.make_pkce()
-    import secrets
     state = secrets.token_urlsafe(24)
     request.session["oauth_state"] = state
     request.session["pkce_verifier"] = verifier
-    return RedirectResponse(x_api.make_authorize_url(state, challenge), status_code=302)
+    return RedirectResponse(x_api.make_authorize_url(state,challenge),status_code=302)
 
 @app.get("/auth/callback")
-async def auth_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+async def auth_callback(request: Request, code: str="",state: str="",error: str=""):
     if error:
-        return RedirectResponse(f"/?error={quote(error)}", status_code=302)
-    if not code or state != request.session.get("oauth_state"):
-        return RedirectResponse("/?error=Invalid+OAuth+callback", status_code=302)
+        return RedirectResponse("/?error=X+authorization+was+not+completed",status_code=302)
+    expected = request.session.pop("oauth_state",None)
+    verifier = request.session.pop("pkce_verifier",None)
+    if not code or not expected or not secrets.compare_digest(state,expected) or not verifier:
+        return RedirectResponse("/?error=Invalid+OAuth+callback",status_code=302)
     try:
-        await x_api.exchange_code(code, request.session["pkce_verifier"])
-        return RedirectResponse("/", status_code=302)
-    except Exception as e:
-        return RedirectResponse(f"/?error={quote(str(e))}", status_code=302)
+        await x_api.exchange_code(code,verifier)
+        try:
+            db.set_setting("x_profile",await x_api.me())
+        except (httpx.HTTPError, ServiceError):
+            pass
+        return RedirectResponse("/?ok=X+connected.+You+can+return+to+the+desktop+app.",status_code=302)
+    except (httpx.HTTPError, ServiceError, RuntimeError):
+        return RedirectResponse("/?error=Could+not+connect+X.+Check+your+credentials+and+callback+URL.",status_code=302)
 
 @app.post("/auth/logout")
-async def auth_logout():
+def logout():
     clear_tokens()
-    return RedirectResponse("/", status_code=303)
+    return {"ok":True}
 
-@app.get("/parse-tweet-url")
-async def parse_url(tweet_url: str = ""):
+@app.post("/api/health/x")
+async def test_x():
+    profile = await x_api.me()
+    db.set_setting("x_profile",profile)
+    return {"ok":True,"profile":profile}
+
+@app.post("/api/health/ai")
+async def test_ai():
+    from .providers import provider
     try:
-        return parse_tweet_url(tweet_url)
-    except ValueError as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
+        await provider().health_check()
+    except Exception:
+        db.set_setting("ai_health", {"ok":False,"checked_at":db.now()})
+        raise
+    db.set_setting("ai_health",{"ok":True,"checked_at":db.now()})
+    return {"ok":True}
 
+from .workspace_routes import router as workspace_router
+from .search_routes import router as search_router
+app.include_router(workspace_router)
+app.include_router(search_router)
 
-@app.post("/draft", response_class=HTMLResponse)
-async def draft(
-    request: Request,
-    tweet_url: str = Form(""),
-    tweet_text: str = Form(""),
-    author_username: str = Form(""),
-    previous_draft: str = Form(""),
-):
-    source = dict(tweet_url=tweet_url, tweet_text=tweet_text,
-                  author_username=author_username)
-    try:
-        source.update(parse_tweet_url(tweet_url))
-        source["tweet_text"] = tweet_text.strip()
-        source["author_username"] = author_username.strip().lstrip("@") or source["author_username"]
-        if not source["tweet_text"]:
-            raise ValueError("Paste the tweet text before generating a reply.")
-        if not re.fullmatch(r"[A-Za-z0-9_]{1,15}", source["author_username"]):
-            raise ValueError("Enter an author username using 1-15 letters, numbers, or underscores.")
-    except ValueError as e:
-        return templates.TemplateResponse(
-            "index.html", ctx(request, **source, error=str(e)), status_code=400
-        )
-    try:
-        text = await draft_reply(source["tweet_text"], source["author_username"])
-    except Exception as e:
-        if isinstance(e, httpx.HTTPStatusError):
-            error = f"AI generation failed (HTTP {e.response.status_code}). Check your AI configuration and quota, then try again."
-        elif isinstance(e, httpx.RequestError):
-            error = "Could not reach the configured AI model. Please try again."
-        elif isinstance(e, RuntimeError):
-            error = str(e)
-        else:
-            error = "AI generation failed. Please try again."
-        page = "draft.html" if previous_draft else "index.html"
-        return templates.TemplateResponse(
-            page, ctx(request, **source, draft=previous_draft, error=error), status_code=502
-        )
-    return templates.TemplateResponse(
-        "draft.html", ctx(request, **source, draft=text)
-    )
-
-
-def ensure_can_write(text: str):
-    if not text.strip():
-        raise ValueError("Enter some text before publishing.")
-    if action_count_today() >= settings.daily_write_cap:
-        raise RuntimeError(f"Local daily write cap reached ({settings.daily_write_cap}).")
-    if duplicate_recent(text):
-        raise RuntimeError("Duplicate text blocked. Edit the wording before posting.")
-
-@app.post("/post")
-async def post(text: str = Form(...)):
-    try:
-        ensure_can_write(text)
-        result = await x_api.create_post(text.strip())
-        log_action("post", text.strip(), result.get("data", {}).get("id"))
-        return RedirectResponse("/?ok=Post+published", status_code=303)
-    except Exception as e:
-        return RedirectResponse(f"/?error={quote(str(e))}", status_code=303)
-
-def write_error(request, text, tweet_url, tweet_text, author_username, error):
-    # Preserve the edited reply and its source if X rejects a write.
-    try:
-        source = parse_tweet_url(tweet_url)
-    except ValueError:
-        return RedirectResponse(f"/?error={quote(error)}", status_code=303)
-    source["author_username"] = author_username or source["author_username"]
-    return templates.TemplateResponse(
-        "draft.html",
-        ctx(request, **source, tweet_text=tweet_text, draft=text, error=error),
-        status_code=400,
-    )
-
-
-@app.post("/quote")
-async def quote_post(
-    request: Request,
-    tweet_id: str = Form(...),
-    text: str = Form(...),
-    tweet_url: str = Form(""),
-    tweet_text: str = Form(""),
-    author_username: str = Form(""),
-):
-    try:
-        ensure_can_write(text)
-        result = await x_api.create_quote(text.strip(), tweet_id)
-        log_action("quote", text.strip(), tweet_id)
-        return RedirectResponse("/?ok=Quote+published", status_code=303)
-    except Exception as e:
-        return write_error(request, text, tweet_url, tweet_text, author_username, str(e))
-
-
-@app.post("/reply")
-async def reply(
-    request: Request,
-    tweet_id: str = Form(...),
-    text: str = Form(...),
-    tweet_url: str = Form(""),
-    tweet_text: str = Form(""),
-    author_username: str = Form(""),
-):
-    try:
-        ensure_can_write(text)
-        result = await x_api.create_reply(text.strip(), tweet_id)
-        log_action("reply", text.strip(), tweet_id)
-        return RedirectResponse("/?ok=Reply+published", status_code=303)
-    except Exception as e:
-        # Do not retry. Keep the draft available for manual approval on X.
-        msg = "API reply did not complete. Check X before trying again or replying manually. " + str(e)
-        return write_error(request, text, tweet_url, tweet_text, author_username, msg)
+from .desktop_control import router as desktop_router
+app.include_router(desktop_router)

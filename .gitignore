@@ -40,3 +40,14 @@ dist/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Desktop builds and encrypted local data
+node_modules/
+src-tauri/target/
+src-tauri/binaries/*.exe
+src-tauri/binaries/xea-backend-*
+src-tauri/gen/
+*.spec
+*.bin
+.data/
+artifacts/

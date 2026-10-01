@@ -1,0 +1,8 @@
+#!/bin/sh
+if [ -x .venv/Scripts/python.exe ]; then
+  .venv/Scripts/python.exe -B scripts/secret_scan.py --staged
+elif [ -x .venv/bin/python ]; then
+  .venv/bin/python -B scripts/secret_scan.py --staged
+else
+  python -B scripts/secret_scan.py --staged
+fi

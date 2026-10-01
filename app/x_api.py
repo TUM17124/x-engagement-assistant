@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 import httpx
 
 from .config import settings
+from .errors import check_response, request
 from .storage import load_tokens, save_tokens
 
 AUTH_URL = "https://x.com/i/oauth2/authorize"
@@ -52,7 +53,7 @@ async def exchange_code(code: str, verifier: str):
     }
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.post(TOKEN_URL, headers=headers, data=data)
-        r.raise_for_status()
+        check_response(r, "X")
         payload = r.json()
 
     expires_at = int(time.time()) + int(payload.get("expires_in", 7200)) - 60
@@ -82,7 +83,7 @@ async def refresh_if_needed():
 
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.post(TOKEN_URL, headers=headers, data=data)
-        r.raise_for_status()
+        check_response(r, "X")
         payload = r.json()
 
     expires_at = int(time.time()) + int(payload.get("expires_in", 7200)) - 60
@@ -101,7 +102,7 @@ async def me():
             params={"user.fields": "username,name,verified"},
             headers={"Authorization": f"Bearer {token}"},
         )
-        r.raise_for_status()
+        check_response(r, "X")
         return r.json()["data"]
 
 async def create_post(text: str):
@@ -112,8 +113,7 @@ async def create_post(text: str):
             json={"text": text},
             headers={"Authorization": f"Bearer {token}"},
         )
-        if r.status_code >= 400:
-            raise RuntimeError(f"X API {r.status_code}: {r.text}")
+        check_response(r, "X")
         return r.json()
 
 async def create_quote(text: str, tweet_id: str):
@@ -124,8 +124,7 @@ async def create_quote(text: str, tweet_id: str):
             json={"text": text, "quote_tweet_id": tweet_id},
             headers={"Authorization": f"Bearer {token}"},
         )
-        if r.status_code >= 400:
-            raise RuntimeError(f"X API {r.status_code}: {r.text}")
+        check_response(r, "X")
         return r.json()
 
 async def create_reply(text: str, tweet_id: str):
@@ -139,6 +138,13 @@ async def create_reply(text: str, tweet_id: str):
             },
             headers={"Authorization": f"Bearer {token}"},
         )
-        if r.status_code >= 400:
-            raise RuntimeError(f"X API {r.status_code}: {r.text}")
+        check_response(r, "X")
         return r.json()
+
+
+async def read_endpoint(path, params=None):
+    token = settings.x_bearer_token or await refresh_if_needed()
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await request(client, "GET", API + path, "X", params=params,
+                                 headers={"Authorization": f"Bearer {token}"})
+        return response.json()

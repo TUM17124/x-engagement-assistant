@@ -1,194 +1,232 @@
 import asyncio
-from contextlib import ExitStack
-from dataclasses import replace
 import json
-from pathlib import Path
-import re
-import shutil
-import subprocess
-import tempfile
-import unittest
-from unittest.mock import AsyncMock, patch
-
-import httpx
-from fastapi.testclient import TestClient
-from app import drafting, main, storage, x_api
+from datetime import datetime,timedelta,timezone
+from unittest.mock import patch,AsyncMock
+from support import AppTest,db,prefs,ws,storage,x_api,vault
+from app import workers,discovery,search
+from app.errors import ServiceError
 from app.post_urls import parse_tweet_url
+from app.backup import backup_bytes,restore_bytes
 
-SOURCE = {
-    "tweet_url": "https://x.com/username/status/123456789?s=20",
-    "tweet_text": "What makes a PDF reader useful?",
-    "author_username": "username",
-}
+class WorkflowTests(AppTest):
+    def test_dashboard_onboarding_and_csrf(self):
+        self.assertEqual(self.client.get("/").status_code,200)
+        self.assertFalse(self.client.get("/api/bootstrap").json()["settings"]["onboarded"])
+        self.assertEqual(self.post("/api/onboarding/finish").status_code,200)
+        self.assertTrue(prefs.get("onboarded"))
+        self.client.headers.pop("X-CSRF-Token")
+        self.assertEqual(self.post("/api/drafts",{"kind":"original","text":"No"}).status_code,403)
+        self.assertEqual(db.rows("SELECT * FROM drafts"),[])
 
+    def test_url_parser_and_invalid_sources(self):
+        for u in ["https://x.com/name/status/123?s=20","https://twitter.com/name/status/123/"]:
+            self.assertEqual(parse_tweet_url(u)["tweet_id"],"123")
+        for u in ["bad","https://x.com.evil/u/status/123","https://x.com@evil/u/status/123","javascript:alert(1)","https://[bad","https://x.com/u/status/a"]:
+            with self.subTest(u=u):
+                self.assertEqual(self.client.get("/parse-tweet-url",params={"tweet_url":u}).status_code,400)
+        source=self.source()
+        self.assertEqual(source["id"],"1234567890123456789")
+        self.assertEqual(source["username"],"test_user")
 
-class WorkflowTests(unittest.TestCase):
-    def setUp(self):
-        self.stack = ExitStack()
-        self.addCleanup(self.stack.close)
-        folder = self.stack.enter_context(tempfile.TemporaryDirectory())
-        self.stack.enter_context(patch.object(storage, "DB_PATH", Path(folder) / "test.db"))
-        # Any unmocked external request is a test failure. Never use real X credentials.
-        self.network = self.stack.enter_context(patch.object(
-            httpx.AsyncClient, "send", side_effect=AssertionError("External network forbidden")
-        ))
-        self.client = self.stack.enter_context(TestClient(main.app))
+    def test_approval_is_exact_and_edit_invalidates(self):
+        draft=self.draft()
+        with patch.object(x_api,"create_post",new_callable=AsyncMock,return_value={"data":{"id":"999"}}) as send:
+            self.assertEqual(self.post(f"/api/drafts/{draft['id']}/publish").status_code,400)
+            self.assertEqual(self.post(f"/api/drafts/{draft['id']}/approve").status_code,200)
+            self.client.put(f"/api/drafts/{draft['id']}",json={"kind":"original","text":"Changed after approval"})
+            self.assertEqual(self.post(f"/api/drafts/{draft['id']}/publish").status_code,400)
+            send.assert_not_awaited()
+            self.post(f"/api/drafts/{draft['id']}/approve")
+            self.assertEqual(self.post(f"/api/drafts/{draft['id']}/publish").status_code,200)
+            self.assertEqual(self.post(f"/api/drafts/{draft['id']}/publish").status_code,400)
+            send.assert_awaited_once()
+        self.assertEqual(storage.action_count_today(),1)
 
-    def test_dashboard_and_removed_search(self):
-        response = self.client.get("/")
-        self.assertEqual(response.status_code, 200)
-        for label in ("Draft from X Post", "Open X Search", "Generate Reply", "Publish an original post"):
-            self.assertIn(label, response.text)
-        self.assertIn('action="https://x.com/search" target="_blank"', response.text)
-        self.assertNotIn("Search recent posts", response.text)
-        self.assertEqual(self.client.post("/search", data={"query": "PDF"}).status_code, 404)
-        self.assertFalse(hasattr(x_api, "recent_search"))
+    def test_reply_manual_quote_and_skip(self):
+        f=self.source()
+        d=self.draft("reply","Specific response & a question?",f["id"])
+        self.assertEqual(self.post(f"/api/drafts/{d['id']}/manual").status_code,400)
+        self.post(f"/api/drafts/{d['id']}/approve")
+        result=self.post(f"/api/drafts/{d['id']}/manual").json()
+        from urllib.parse import urlsplit,parse_qs
+        query=parse_qs(urlsplit(result["url"]).query)
+        self.assertEqual(query["in_reply_to"],[f["id"]])
+        self.assertEqual(query["text"],[d["text"]])
+        self.assertEqual(storage.action_count_today(),0)
+        self.assertEqual(db.one("SELECT status FROM activity WHERE channel='manual'")["status"],"opened")
+        quote=self.draft("quote","A different useful angle.",f["id"])
+        self.post(f"/api/drafts/{quote['id']}/approve")
+        with patch.object(x_api,"create_quote",new_callable=AsyncMock,return_value={"data":{"id":"999"}}) as send:
+            self.assertEqual(self.post(f"/api/drafts/{quote['id']}/publish").status_code,200)
+            send.assert_awaited_once_with(quote["text"],f["id"])
+        self.post(f"/api/drafts/{d['id']}/skip")
+        self.assertEqual(ws.get_draft(d["id"])["status"],"skipped")
+
+    def test_duplicate_similar_and_daily_hourly_limits(self):
+        storage.log_action("post","This was already posted.")
+        for text in ["This was already posted.","This was already posted!"]:
+            d=self.draft(text=text)
+            self.assertEqual(self.post(f"/api/drafts/{d['id']}/approve").status_code,400)
+        prefs.save({"daily_write_cap":1})
+        d=self.draft(text="Entirely unrelated useful content")
+        self.assertEqual(self.post(f"/api/drafts/{d['id']}/approve").status_code,400)
+        prefs.save({"daily_write_cap":100,"hourly_write_limit":1})
+        self.assertEqual(self.post(f"/api/drafts/{d['id']}/approve").status_code,400)
+
+    def test_reply_account_limit(self):
+        f=self.source()
+        d=self.draft("reply","What format do you prefer?",f["id"])
+        prefs.save({"same_account_limit":1})
+        ws.activity("reply",ws.get_draft(d["id"]),status="published",channel="API")
+        self.assertEqual(self.post(f"/api/drafts/{d['id']}/approve").status_code,400)
+
+    def test_reply_generation_ranking_skip_and_budget(self):
+        f=self.source()
+        with patch("app.workspace.provider") as factory:
+            factory.return_value.generate_reply=AsyncMock(return_value=json.dumps({"reply":"How do you search your notes?","reason":"Specific PDF workflow question","score":87,"topic":"PDFs"}))
+            d=self.post("/api/generate/reply",{"feed_id":f["id"]}).json()
+            self.assertEqual(d["score"],87)
+            self.assertEqual(d["status"],"draft")
+            self.assertEqual(storage.action_count_today(),0)
+            factory.return_value.generate_reply.return_value="SKIP"
+            self.assertTrue(self.post("/api/generate/reply",{"feed_id":f["id"]}).json()["skipped"])
+        self.assertEqual(db.one("SELECT ignored FROM feed_items")["ignored"],1)
+        prefs.save({"daily_ai_limit":1})
+        with self.assertRaises(ValueError):
+            asyncio.run(ws.ai_call(lambda:AsyncMock()()))
+
+    def test_scheduled_original_publishes_once(self):
+        d=self.draft()
+        self.post(f"/api/drafts/{d['id']}/approve")
+        due=(datetime.now(timezone.utc)+timedelta(hours=1)).isoformat()
+        self.assertEqual(self.post(f"/api/drafts/{d['id']}/schedule",{"due_at":due,"timezone":"Africa/Nairobi"}).status_code,200)
+        db.execute("UPDATE scheduled_posts SET due_at=?",((datetime.now(timezone.utc)-timedelta(seconds=1)).isoformat(),))
+        with patch.object(x_api,"create_post",new_callable=AsyncMock,return_value={"data":{"id":"999"}}) as send:
+            asyncio.run(workers.tick());asyncio.run(workers.tick())
+            send.assert_awaited_once()
+        self.assertEqual(db.one("SELECT status FROM scheduled_posts")["status"],"published")
+
+    def test_scheduler_rejects_replies_and_modified_content(self):
+        f=self.source();d=self.draft("reply","Useful reply",f["id"])
+        self.post(f"/api/drafts/{d['id']}/approve")
+        due=(datetime.now(timezone.utc)+timedelta(hours=1)).isoformat()
+        self.assertEqual(self.post(f"/api/drafts/{d['id']}/schedule",{"due_at":due,"timezone":"UTC"}).status_code,400)
+        d=self.draft();self.post(f"/api/drafts/{d['id']}/approve")
+        self.post(f"/api/drafts/{d['id']}/schedule",{"due_at":due,"timezone":"UTC"})
+        self.client.put(f"/api/drafts/{d['id']}",json={"kind":"original","text":"Edited scheduled text"})
+        self.assertEqual(db.one("SELECT status FROM scheduled_posts")["status"],"cancelled")
+
+    def test_recovery_marks_missed_and_uncertain_no_replay(self):
+        d=self.draft();ws.approve(d["id"])
+        ws.schedule(d["id"],(datetime.now(timezone.utc)+timedelta(hours=1)).isoformat(),"UTC")
+        db.execute("UPDATE scheduled_posts SET due_at='2000-01-01T00:00:00+00:00'")
+        workers.recover()
+        self.assertEqual(db.one("SELECT status FROM scheduled_posts")["status"],"missed")
+        db.execute("UPDATE drafts SET status='sending'")
+        workers.recover()
+        self.assertEqual(ws.get_draft(d["id"])["status"],"uncertain")
         self.network.assert_not_called()
 
-    def test_url_parsing(self):
-        for url in (SOURCE["tweet_url"], "https://www.x.com/username/status/123456789/",
-                    "https://twitter.com/username/status/123456789#text"):
-            with self.subTest(url=url):
-                response = self.client.get("/parse-tweet-url", params={"tweet_url": url})
-                self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.json()["tweet_id"], "123456789")
-                self.assertEqual(response.json()["author_username"], "username")
-        large = "https://x.com/user_1/status/1234567890123456789"
-        self.assertEqual(parse_tweet_url(large)["tweet_id"], "1234567890123456789")
+    def test_failed_reply_retains_text_and_never_retries(self):
+        f=self.source();d=self.draft("reply","My final edited reply",f["id"]);ws.approve(d["id"])
+        with patch.object(x_api,"create_reply",new_callable=AsyncMock,side_effect=ServiceError("X",403)) as send:
+            self.assertEqual(self.post(f"/api/drafts/{d['id']}/publish").status_code,400)
+            send.assert_awaited_once()
+        self.assertEqual(ws.get_draft(d["id"])["text"],d["text"])
+        self.assertEqual(storage.action_count_today(),0)
 
-    def test_invalid_urls_are_clear_errors(self):
-        for url in ("", "bad", "https://example.com/u/status/123", "https://x.com.evil.test/u/status/123",
-                    "https://x.com@evil.test/u/status/123", "https://x.com/u/status/not-a-number",
-                    "https://x.com/u/status/0", "javascript:alert(1)", "https://[bad",
-                    "https://x.com/u/status/123/extra", "https://x.com/u/sta\ntus/123"):
-            with self.subTest(url=url):
-                response = self.client.get("/parse-tweet-url", params={"tweet_url": url})
-                self.assertEqual(response.status_code, 400)
-                self.assertIn("valid X post URL", response.json()["error"])
-        with patch.object(main, "draft_reply", new_callable=AsyncMock) as ai:
-            response = self.client.post("/draft", data={**SOURCE, "tweet_url": "bad"})
-            self.assertEqual(response.status_code, 400)
-            self.assertIn(SOURCE["tweet_text"], response.text)
-            ai.assert_not_awaited()
+    def test_threads_approve_full_content_and_record_each_part(self):
+        d=self.draft("thread","First useful thought.\n---\nA separate conclusion.")
+        ws.approve(d["id"])
+        with patch.object(x_api,"create_post",new_callable=AsyncMock,return_value={"data":{"id":"1"}}) as first,patch.object(x_api,"create_reply",new_callable=AsyncMock,return_value={"data":{"id":"2"}}) as next_post:
+            result=self.post(f"/api/drafts/{d['id']}/publish")
+            self.assertEqual(result.status_code,200,result.text)
+            first.assert_awaited_once();next_post.assert_awaited_once_with("A separate conclusion.","1")
+        self.assertEqual(storage.action_count_today(),2)
 
-    def test_generate_and_regenerate_never_write(self):
-        with patch.object(main, "draft_reply", new_callable=AsyncMock, return_value="Useful draft") as ai:
-            response = self.client.post("/draft", data={**SOURCE, "author_username": ""})
-            self.assertEqual(response.status_code, 200)
-            ai.assert_awaited_once_with(SOURCE["tweet_text"], "username")
-            for label in ("Useful draft", "Try API Reply", "Quote Post", "Reply Manually on X", "Regenerate", "Skip"):
-                self.assertIn(label, response.text)
-            response = self.client.post("/draft", data={**SOURCE, "previous_draft": "My edit"})
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(ai.await_count, 2)
-        self.assertEqual(storage.action_count_today(), 0)
-        self.network.assert_not_called()
+    def test_watchlist_dedup_priority_and_last_seen(self):
+        data={"username":"@test_user","priority":"High","topics":"PDFs"}
+        r=self.post("/api/watchlist",data);self.assertEqual(r.status_code,200)
+        self.assertEqual(self.post("/api/watchlist",data).status_code,400)
+        prefs.save({"read_access":True})
+        payload={"data":[{"id":"99","author_id":"1","text":"A new PDF idea"}],"includes":{"users":[{"id":"1","username":"test_user"}]}}
+        with patch.object(x_api,"read_endpoint",new_callable=AsyncMock,side_effect=[{"data":{"id":"1"}},payload]) as read:
+            self.assertEqual(self.post(f"/api/watchlist/{r.json()['id']}/refresh").status_code,200)
+            self.assertEqual(self.post(f"/api/watchlist/{r.json()['id']}/refresh").status_code,400)
+            self.assertEqual(read.await_count,2)
+        self.assertEqual(db.one("SELECT last_seen_id FROM watched_accounts")["last_seen_id"],"99")
 
-    def test_input_and_ai_errors_preserve_content(self):
-        with patch.object(main, "draft_reply", new_callable=AsyncMock) as ai:
-            for changes in ({"tweet_text": "   "}, {"author_username": "invalid name"}):
-                self.assertEqual(self.client.post("/draft", data={**SOURCE, **changes}).status_code, 400)
-            ai.assert_not_awaited()
-        with patch.object(main, "draft_reply", new_callable=AsyncMock, side_effect=RuntimeError("AI unavailable")):
-            response = self.client.post("/draft", data=SOURCE)
-            self.assertEqual(response.status_code, 502)
-            self.assertIn(SOURCE["tweet_text"], response.text)
-            response = self.client.post("/draft", data={**SOURCE, "previous_draft": "Keep my edited reply"})
-            self.assertIn("Keep my edited reply", response.text)
-            self.assertIn("Reply Manually on X", response.text)
-        error = httpx.HTTPStatusError("secret provider detail", request=httpx.Request("POST", "https://ai.test"),
-                                      response=httpx.Response(429))
-        with patch.object(main, "draft_reply", new_callable=AsyncMock, side_effect=error):
-            response = self.client.post("/draft", data=SOURCE)
-            self.assertIn("HTTP 429", response.text)
-            self.assertNotIn("secret provider detail", response.text)
+    def test_topics_web_query_and_mutes(self):
+        r=self.post("/api/topics",{"name":"PDF editing","keywords":"PDF editor,ebook","excluded":"spam","languages":"en"})
+        self.assertEqual(r.status_code,200)
+        topic=self.client.get("/api/topics").json()[0]
+        self.assertIn('"PDF editor" OR "ebook"',topic["query"])
+        self.assertIn('-"spam"',topic["query"])
+        self.assertIn("https://x.com/search?",topic["search_url"])
+        self.source()
+        self.post("/api/mute/author",{"value":"test_user"})
+        self.assertEqual(self.client.get("/api/feed").json(),[])
 
-    def test_failed_x_write_preserves_edit_without_counting_or_retrying(self):
-        for route, method in (("/reply", "create_reply"), ("/quote", "create_quote")):
-            with patch.object(x_api, method, new_callable=AsyncMock, side_effect=RuntimeError("X API 403")) as send:
-                response = self.client.post(route, data={**SOURCE, "tweet_id": "123456789", "text": "My edited reply"})
-                self.assertEqual(response.status_code, 400)
-                self.assertIn("My edited reply", response.text)
-                self.assertIn("Reply Manually on X", response.text)
-                send.assert_awaited_once()
-        self.assertEqual(storage.action_count_today(), 0)
+    def test_paid_search_results_metrics_and_counters(self):
+        payload={"data":[{"id":"111","author_id":"1","text":"Useful PDF advice","public_metrics":{"like_count":9}}],
+                 "includes":{"users":[{"id":"1","username":"test_user","name":"Test"}]}}
+        with patch.object(x_api,"read_endpoint",new_callable=AsyncMock,return_value=payload) as read:
+            r=self.post("/api/search",{"query":'("PDF editor" OR ebook)',"language":"en","exclude_replies":True,"author":"test_user","max_results":10})
+            self.assertEqual(r.status_code,200,r.text)
+            self.assertEqual(r.json()["mode"],"api")
+            read.assert_awaited_once()
+            self.assertEqual(read.call_args.args[0],"/tweets/search/recent")
+            self.assertIn("from:test_user",read.call_args.args[1]["query"])
+        status=self.client.get("/api/search/status").json()
+        self.assertEqual((status["searches_today"],status["posts_retrieved_today"]),(1,1))
+        self.assertEqual(status["state"],"Available")
+        self.assertIn("like_count",self.client.get("/api/feed").json()[0]["metrics"])
 
-    def test_api_write_history_duplicates_and_daily_cap(self):
-        for route, method in (("/post", "create_post"), ("/quote", "create_quote"), ("/reply", "create_reply")):
-            with patch.object(x_api, method, new_callable=AsyncMock, return_value={"data": {"id": "456"}}) as send:
-                data = {**SOURCE, "tweet_id": "123456789", "text": "Approved " + route}
-                response = self.client.post(route, data=data, follow_redirects=False)
-                self.assertEqual(response.status_code, 303)
-                send.assert_awaited_once()
-                self.client.post(route, data=data, follow_redirects=False)
-                self.assertEqual(send.await_count, 1, "Duplicate must not reach X")
-                with patch.object(main, "action_count_today", return_value=main.settings.daily_write_cap):
-                    self.client.post(route, data={**data, "text": "New text"}, follow_redirects=False)
-                self.assertEqual(send.await_count, 1, "Daily cap must block X write")
-        self.assertEqual(storage.action_count_today(), 3)
-        self.assertEqual(len(storage.recent_actions()), 3)
-        self.network.assert_not_called()
+    def test_402_fallback_same_query_and_no_repeated_retry(self):
+        with patch.object(x_api,"read_endpoint",new_callable=AsyncMock,side_effect=ServiceError("X",402)) as read:
+            first=self.post("/api/search",{"query":"PDF lang:en"}).json()
+            second=self.post("/api/search",{"query":"PDF lang:en"}).json()
+            self.assertEqual(first["mode"],"web")
+            self.assertIn("Paid X API search is unavailable",first["message"])
+            from urllib.parse import parse_qs,urlsplit
+            self.assertEqual(parse_qs(urlsplit(first["web_url"]).query)["q"],[first["query"]])
+            self.assertEqual(second["mode"],"web")
+            read.assert_awaited_once()
+        self.assertEqual(search.status()["state"],"Requires Credits")
 
-    @unittest.skipUnless(shutil.which("node"), "Node required for JavaScript checks")
-    def test_manual_composer_uses_edited_text_and_string_id(self):
-        with patch.object(main, "draft_reply", new_callable=AsyncMock, return_value="Draft"):
-            response = self.client.post("/draft", data={**SOURCE, "tweet_url": "https://x.com/user/status/1234567890123456789"})
-        script = re.search(r"<script>(.*?)</script>", response.text, re.S).group(1)
-        harness = r'''const vm = require('vm');
-const assert = require('assert');
-const code = JSON.parse(require('fs').readFileSync(0, 'utf8'));
-const elements = {
-  draft: {value: 'Edited reply & question? #PDF', addEventListener() {}},
-  count: {}, manual: {}
-};
-const context = {document: {getElementById: id => elements[id]}, URLSearchParams};
-vm.createContext(context);
-vm.runInContext(code, context);
-const url = new URL(elements.manual.href);
-assert.equal(url.origin, 'https://x.com');
-assert.equal(url.pathname, '/intent/tweet');
-assert.equal(url.searchParams.get('in_reply_to'), '1234567890123456789');
-assert.equal(url.searchParams.get('text'), elements.draft.value);
-const field = {};
-assert.equal(context.copyDraft({querySelector: () => field}), true);
-assert.equal(field.value, elements.draft.value);
-elements.draft.value = '   ';
-assert.equal(context.copyDraft({querySelector: () => field}), false);
-'''
-        result = subprocess.run(["node", "-e", harness], input=json.dumps(script), text=True, capture_output=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        dashboard = self.client.get("/").text
-        script = re.search(r"<script>(.*?)</script>", dashboard, re.S).group(1)
-        result = subprocess.run(["node", "--check"], input=script, text=True, capture_output=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
+    def test_web_only_and_daily_search_limit(self):
+        prefs.save({"discovery_mode":"web"})
+        self.assertEqual(self.post("/api/search",{"query":"PDF"}).json()["mode"],"web")
+        self.assertEqual(search.status()["searches_today"],0)
+        prefs.save({"discovery_mode":"automatic","daily_search_limit":1})
+        with patch.object(x_api,"read_endpoint",new_callable=AsyncMock,return_value={"data":[]}) as read:
+            self.post("/api/search",{"query":"PDF"})
+            result=self.post("/api/search",{"query":"books"}).json()
+            self.assertIn("Daily API search limit",result["message"])
+            read.assert_awaited_once()
 
+    def test_search_rate_limit_backoff(self):
+        with patch.object(x_api,"read_endpoint",new_callable=AsyncMock,side_effect=ServiceError("X",429,900)) as read:
+            self.post("/api/search",{"query":"PDF"})
+            self.post("/api/search",{"query":"PDF"})
+            read.assert_awaited_once()
+        self.assertTrue(db.get_setting("read_backoff_until"))
 
-class AIRequestTests(unittest.TestCase):
-    def test_configured_model_only_receives_source_content(self):
-        config = replace(drafting.settings, ai_base_url="https://ai.test/v1", ai_api_key="test-key", ai_model="test-model")
-        response = httpx.Response(200, json={"choices": [{"message": {"content": "A contextual reply"}}]},
-                                  request=httpx.Request("POST", "https://ai.test/v1/chat/completions"))
-        with patch.object(drafting, "settings", config), patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock, return_value=response) as post:
-            text = asyncio.run(drafting.draft_reply(SOURCE["tweet_text"], "username"))
-            self.assertEqual(text, "A contextual reply")
-            self.assertEqual(post.call_args.args[0], config.ai_base_url + "/chat/completions")
-            body = post.call_args.kwargs["json"]
-            self.assertEqual(body["model"], "test-model")
-            self.assertEqual(body["messages"][1]["content"], "Write one reply to @username:\n\n" + SOURCE["tweet_text"])
-            self.assertNotIn(SOURCE["tweet_url"], json.dumps(body))
-            self.assertEqual(post.call_args.kwargs["headers"]["Authorization"], "Bearer test-key")
+    def test_backup_excludes_secrets_and_restore_clears_approval(self):
+        vault.set("ai_api_key_gemini","unit-test-private-key")
+        d=self.draft();ws.approve(d["id"])
+        ws.schedule(d["id"],(datetime.now(timezone.utc)+timedelta(hours=1)).isoformat(),"UTC")
+        blob=backup_bytes()
+        self.assertNotIn(b"unit-test-private-key",blob)
+        restore_bytes(blob)
+        self.assertEqual(db.rows("SELECT * FROM approved_content"),[])
+        self.assertEqual(db.one("SELECT status FROM drafts")["status"],"draft")
+        self.assertEqual(db.one("SELECT status FROM scheduled_posts")["status"],"cancelled")
+        self.assertEqual(vault.get("ai_api_key_gemini"),"unit-test-private-key")
+        with self.assertRaises(ValueError):restore_bytes(b"not sqlite")
 
-    def test_missing_config_and_empty_response_are_errors(self):
-        with patch.object(drafting, "settings", replace(drafting.settings, ai_base_url="")):
-            with self.assertRaisesRegex(RuntimeError, "Configure AI_BASE_URL"):
-                asyncio.run(drafting.draft_reply("Test"))
-        for payload in ({}, {"choices": [{"message": {"content": ""}}]}):
-            response = httpx.Response(200, json=payload, request=httpx.Request("POST", "https://ai.test"))
-            config = replace(drafting.settings, ai_base_url="https://ai.test", ai_model="test")
-            with patch.object(drafting, "settings", config), patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock, return_value=response):
-                with self.assertRaises(RuntimeError):
-                    asyncio.run(drafting.draft_reply("Test"))
-
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_database_migrations_idempotent(self):
+        db.init_db();db.init_db()
+        with db.conn() as c:
+            self.assertEqual(c.execute("PRAGMA user_version").fetchone()[0],db.SCHEMA_VERSION)
+            self.assertIsNone(c.execute("SELECT name FROM sqlite_master WHERE name='tokens'").fetchone())
