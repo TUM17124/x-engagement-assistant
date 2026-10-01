@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>X Engagement Assistant</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin:0; background:#050505; color:#f5f5f5; font-family:Arial,Helvetica,sans-serif; }
+    a { color:inherit; }
+    .wrap { width:min(1100px,92vw); margin:0 auto; padding:28px 0 60px; }
+    .top { display:flex; justify-content:space-between; align-items:center; gap:16px; }
+    h1 { font-size:28px; margin:0; }
+    .muted { color:#9b9b9b; }
+    .card { border:1px solid #242424; background:#0d0d0d; border-radius:18px; padding:18px; margin-top:18px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    input, textarea { width:100%; box-sizing:border-box; background:#111; color:white; border:1px solid #333; border-radius:12px; padding:12px; }
+    textarea { min-height:100px; resize:vertical; }
+    button,.btn { background:white; color:black; border:0; border-radius:999px; padding:10px 16px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-block; }
+    .ghost { background:#171717; color:white; border:1px solid #333; }
+    .danger { background:#3b1010; color:#ffdede; }
+    .tweet { border-top:1px solid #222; padding:16px 0; }
+    .tweet:first-child { border-top:0; }
+    .stats { font-size:12px; color:#8f8f8f; display:flex; gap:14px; }
+    .pill { border:1px solid #333; border-radius:999px; padding:6px 10px; font-size:12px; }
+    .ok { border-color:#194d2c; background:#0b2513; }
+    .error { border-color:#5f2020; background:#2c0e0e; }
+    .two { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    @media(max-width:760px){ .two{grid-template-columns:1fr;} }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  {% block content %}{% endblock %}
+</div>
+</body>
+</html>

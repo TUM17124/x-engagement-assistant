@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<a href="/" class="muted">&larr; Back</a>
+{% if error %}<div class="card error" role="alert">{{ error }}</div>{% endif %}
+<div class="card">
+  <div class="muted">Responding to @{{ author_username }}</div>
+  <p style="white-space:pre-wrap">{{ tweet_text }}</p>
+  <a href="{{ tweet_url }}" target="_blank" rel="noopener noreferrer">Open original post on X</a>
+</div>
+
+<div class="card">
+  <h2>Edit draft</h2>
+  <label for="draft" class="muted">Reply text</label>
+  <textarea id="draft" maxlength="280">{{ draft }}</textarea>
+  <div class="muted" id="count"></div>
+  <div class="row" style="margin-top:14px">
+    {% for route, label in [('/reply', 'Try API Reply'), ('/quote', 'Quote Post')] %}
+    <form method="post" action="{{ route }}" onsubmit="return copyDraft(this)">
+      <input type="hidden" name="tweet_id" value="{{ tweet_id }}">
+      <input type="hidden" name="tweet_url" value="{{ tweet_url }}">
+      <input type="hidden" name="tweet_text" value="{{ tweet_text }}">
+      <input type="hidden" name="author_username" value="{{ author_username }}">
+      <input type="hidden" name="text">
+      <button {% if route == '/quote' %}class="ghost"{% endif %}>{{ label }}</button>
+    </form>
+    {% endfor %}
+    <a id="manual" class="btn ghost" target="_blank" rel="noopener noreferrer"
+       href="https://x.com/intent/tweet?in_reply_to={{ tweet_id }}">Reply Manually on X</a>
+    <form method="post" action="/draft" onsubmit="this.elements.previous_draft.value = box.value">
+      <input type="hidden" name="tweet_url" value="{{ tweet_url }}">
+      <input type="hidden" name="tweet_text" value="{{ tweet_text }}">
+      <input type="hidden" name="author_username" value="{{ author_username }}">
+      <input type="hidden" name="previous_draft">
+      <button class="ghost">Regenerate</button>
+    </form>
+    <a class="btn ghost" href="/">Skip</a>
+  </div>
+  <p class="muted" style="font-size:13px">
+    Try API Reply and Quote Post publish when clicked. Reply Manually on X opens a composer for you to review and send.
+    Manual replies are not tracked in the local activity history or daily write counter.
+  </p>
+</div>
+<script>
+const box = document.getElementById('draft');
+const count = document.getElementById('count');
+const manual = document.getElementById('manual');
+function sync(){
+  count.textContent = box.value.length + '/280';
+  manual.href = 'https://x.com/intent/tweet?' + new URLSearchParams({
+    in_reply_to: {{ tweet_id | tojson }}, text: box.value
+  });
+}
+function copyDraft(form){
+  form.querySelector('input[name="text"]').value = box.value;
+  return box.value.trim().length > 0;
+}
+box.addEventListener('input', sync);
+sync();
+</script>
+{% endblock %}

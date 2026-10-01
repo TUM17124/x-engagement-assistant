@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="top">
+  <div>
+    <h1>X Engagement Assistant</h1>
+    <div class="muted">Local · X-only · approval-first</div>
+  </div>
+  <div class="row">
+    <span class="pill">{{ today_count }}/{{ daily_cap }} writes today</span>
+    {% if connected %}
+      {% if profile %}<span class="pill">@{{ profile.username }}</span>{% endif %}
+      <form method="post" action="/auth/logout"><button class="ghost">Disconnect</button></form>
+    {% else %}
+      <a class="btn" href="/auth/login">Connect X account</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if request.query_params.get('ok') %}
+<div class="card ok">{{ request.query_params.get('ok') }}</div>
+{% endif %}
+{% if request.query_params.get('error') %}
+<div class="card error">{{ request.query_params.get('error') }}</div>
+{% endif %}
+{% if error %}
+<div class="card error">{{ error }}</div>
+{% endif %}
+
+<div class="card">
+  <h3>Open X Search</h3>
+  <p class="muted">Open X Search &rarr; find tweet &rarr; copy URL/text &rarr; paste &rarr; Generate Reply &rarr; edit &rarr; Reply/Quote/Skip</p>
+  <form method="get" action="https://x.com/search" target="_blank" rel="noopener noreferrer">
+    <label for="search-query" class="muted">Search text</label>
+    <div class="row" style="margin-top:8px">
+      <input id="search-query" name="q" style="flex:1;min-width:220px" value="{{ default_query }}" required>
+      <input type="hidden" name="src" value="typed_query">
+      <input type="hidden" name="f" value="live">
+      <button>Open X Search</button>
+    </div>
+  </form>
+</div>
+
+<div class="two">
+  <div class="card">
+    <h3>Draft from X Post</h3>
+    <form method="post" action="/draft" id="source-form">
+      <label for="tweet-url" class="muted">Tweet URL</label>
+      <input id="tweet-url" type="url" name="tweet_url" value="{{ tweet_url or '' }}" placeholder="https://x.com/username/status/123456789" required>
+      <p id="url-status" class="muted" aria-live="polite"></p>
+      <label for="author" class="muted">Author username</label>
+      <input id="author" name="author_username" value="{{ author_username or '' }}" placeholder="username (filled from URL)" maxlength="16">
+      <label for="tweet-text" class="muted" style="display:block;margin-top:12px">Tweet text</label>
+      <textarea id="tweet-text" name="tweet_text" placeholder="Paste the tweet text here..." required>{{ tweet_text or '' }}</textarea>
+      <p class="muted">Only the pasted text and author are sent to your configured AI model. Review the draft before publishing.</p>
+      <button>Generate Reply</button>
+    </form>
+  </div>
+  <div class="card">
+    <h3>Publish an original post</h3>
+    <form method="post" action="/post">
+      <textarea name="text" maxlength="280" placeholder="Write something useful..." required></textarea>
+      <div class="row" style="margin-top:10px"><button>Publish</button></div>
+    </form>
+  </div>
+</div>
+
+<script>
+const sourceUrl = document.getElementById('tweet-url');
+const urlStatus = document.getElementById('url-status');
+let parseVersion = 0;
+sourceUrl.addEventListener('input', () => {
+  parseVersion++;
+  sourceUrl.setCustomValidity('');
+  urlStatus.textContent = '';
+});
+sourceUrl.addEventListener('change', async () => {
+  const version = ++parseVersion;
+  const value = sourceUrl.value.trim();
+  if (!value) return;
+  try {
+    const response = await fetch('/parse-tweet-url?' + new URLSearchParams({tweet_url: value}));
+    const data = await response.json();
+    if (version !== parseVersion) return;
+    if (!response.ok) {
+      sourceUrl.setCustomValidity(data.error);
+      urlStatus.textContent = data.error;
+      return;
+    }
+    sourceUrl.setCustomValidity('');
+    document.getElementById('author').value = data.author_username;
+    urlStatus.textContent = '@' + data.author_username + ' / Tweet ID: ' + data.tweet_id;
+  } catch {
+    if (version === parseVersion) urlStatus.textContent = 'URL will be checked when you generate the reply.';
+  }
+});
+</script>
+
+<div class="card">
+  <h3>Recent local activity</h3>
+  {% if not actions %}<div class="muted">Nothing sent yet.</div>{% endif %}
+  {% for a in actions %}
+    <div class="tweet">
+      <strong>{{ a.action_type }}</strong>
+      <span class="muted">{{ a.created_at }}</span>
+      <div>{{ a.text }}</div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}
