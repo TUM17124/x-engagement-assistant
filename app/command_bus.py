@@ -219,7 +219,7 @@ async def execute_plan(plan,command_id,emit):
     validated=validate(plan)  # Validate the complete plan before executing any part.
     result={"success":True,"message":plan.message,"data":[],"approvalIds":[],"actions":[]}
     for spec,args in validated:
-        emit({"type":"progress","text":"Preparing "+spec.name+"..."})
+        emit({"type":"progress","text":"Working: "+spec.description})
         event(command_id,"tool_requested",spec.name)
         since=(datetime.now(timezone.utc)-timedelta(hours=1)).isoformat()
         count=db.one("SELECT COUNT(*) n FROM command_events WHERE event='tool_succeeded' AND tool=? AND created_at>=?",(spec.name,since))["n"]

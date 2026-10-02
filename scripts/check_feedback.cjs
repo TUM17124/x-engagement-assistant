@@ -1,6 +1,6 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const nodes=[],listeners={};
-function element(){return {dataset:{},disabled:false,textContent:'Generate plan',attributes:{},setAttribute(k,v){this.attributes[k]=v},removeAttribute(k){delete this.attributes[k]},prepend(v){nodes.push(v)},remove(){this.removed=true},scrollIntoView(){},focus(){},closest(){return null}}}
+function element(){return {append(){},dataset:{},disabled:false,textContent:'Generate plan',attributes:{},setAttribute(k,v){this.attributes[k]=v},removeAttribute(k){delete this.attributes[k]},prepend(v){nodes.push(v)},remove(){this.removed=true},scrollIntoView(){},focus(){},closest(){return null}}}
 const root=element();
 const ctx={console,FormData,URLSearchParams,URL,AbortController,TypeError,TextDecoder,crypto:require("crypto").webcrypto,setTimeout,clearTimeout,Intl,
  document:{addEventListener(k,v){(listeners[k]??=[]).push(v)},querySelector(s){return s==='#page-error'?nodes.findLast(n=>n.id==='page-error'&&!n.removed)||null:root},createElement:element},
@@ -46,5 +46,16 @@ vm.runInContext(fs.readFileSync('app/static/forms.js','utf8').replace('start().c
  await vm.runInContext("runTerminal('yes')",ctx);
  assert.equal(sent.approval_id,'preview-one');assert.equal(sent.approval_checksum,'a'.repeat(64));
  await vm.runInContext("runTerminal('yes')",ctx);assert.equal(sent.approval_id,undefined);
+ let delivered=false;
+ ctx.fetch=async()=>({ok:true,body:{getReader(){return {read:async()=>delivered?{done:true}:(delivered=true,{done:false,value:Buffer.from([request,{id:'preview-two',checksum:'b'.repeat(64)}].map(r=>'data: '+JSON.stringify({type:'approval',request:r})+'\n\n').join(''))})}}}});
+ await vm.runInContext("runTerminal('prepare two actions')",ctx);
+ assert.equal(vm.runInContext('terminalPendingApproval',ctx),null);
+
+ // Work stays tracked independently of page rendering and ends with a grounded report.
+ const work=vm.runInContext("beginWork('Draft reply')",ctx);ctx.workId=work;
+ vm.runInContext("progressWork(workId,'Waiting for ChatGPT');finishWork(workId,{state:'completed',message:'Draft is waiting in Response Inbox',suggestions:[{label:'Review',url:'#queue'}]})",ctx);
+ assert.equal(vm.runInContext('activeWork.size',ctx),0);
+ assert(vm.runInContext('workReports[0].message',ctx).includes('Response Inbox'));
+ assert.equal(vm.runInContext('workReports[0].suggestions[0].url',ctx),'#queue');
  console.log('Action feedback passed: HTTP errors, validation, malformed responses, network loss, timeout, duplicate click prevention, and click/form/control boundaries.');
 })().catch(e=>{console.error(e);process.exitCode=1});

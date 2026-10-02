@@ -72,7 +72,7 @@ try:
     plan=request('live weekly planner','POST','/api/social/suggest',{'task':'Weekly plan','platform':'x','timezone':'Africa/Nairobi','text':'Share useful PDF and reading workflows; introduce my open-source engagement app without inventing results.'})
     note('seven-day plan returned',bool(plan.get('text')) and plan.get('text')!='SKIP' and len(plan.get('dates',[]))==7,characters=len(plan.get('text','')))
     saved=request('planner persisted','GET','/api/social/planner')
-    note('saved plan matches',saved.get('text')==plan.get('text'))
+    note('saved plan matches',bool(plan.get('text')) and saved.get('text')==plan.get('text'))
     item=request('manual text import','POST','/api/social/import',{'platform':'x','author':username,'text':'LOCAL APP TEST, not a published tweet: What helps you keep useful PDF annotations organized?'})
     response=request('live AI reply draft','POST','/api/social/analyze',{'id':item['id']})
     note('AI reply is draft or explicit skip',response.get('status')=='draft' or bool(response.get('skipped')))

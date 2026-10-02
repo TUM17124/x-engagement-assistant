@@ -90,3 +90,12 @@ Natural-language follow-ups receive recent user commands, assistant clarificatio
 All shared button/form action boundaries display a progress indicator and persistent, named error messages. Errors offer Settings and History links and expandable technical details. Field validation identifies the field; dropped connections and timeouts explain that an operation may have completed and must be checked before retrying. The app never automatically retries publishing. ChatGPT Plan and OpenAI API-key failures are labeled separately.
 
 The weekly Planner uses dedicated planning instructions, the user's interests and topics, and seven local calendar dates. It saves its last successful result locally and keeps that result if generation fails. It never creates scheduled posts by itself.
+
+
+## Work state and completion reports
+
+A persistent Working indicator shows the active action, current step and elapsed time even when the user changes screens. Activity & Reports shows recent session outcomes. Terminal completion reports are also stored with terminal history.
+
+Reports distinguish Completed, Waiting for approval, Stopped and Needs attention. They use actual service results rather than another AI call. New drafts explicitly say they are waiting for review in Response Inbox. Plans link to AI Planner; schedules link to Schedule; confirmed publications include post IDs and a History link. Reports suggest a next action but never execute that suggestion automatically. Network failure, missing completion and cancellation are not reported as success.
+
+The UI clears stale Terminal action previews when a new command starts. A typed confirmation consumes the selected preview; multiple previews require individual confirmation buttons.

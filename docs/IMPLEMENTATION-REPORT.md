@@ -1,4 +1,18 @@
-# Implementation report ? 0.3.0
+﻿# Implementation report ? 0.3.0
+
+## Latest Planner, control and feedback update
+
+- Reproduced the old live Planner returning SKIP. Replaced reply/rewrite instructions with a dedicated seven-day planning service that includes interests, tracked topics, dates, goals and available evidence. Saves the last successful plan and preserves it on failure.
+- Shared action boundaries provide named persistent errors, progress, field validation, network/timeout guidance and recovery links. OpenAI API-key errors explain that ChatGPT Plan is a separate selection. X errors retain their actual HTTP status and manual alternatives.
+- Expanded to 49 structured Terminal tools over the existing services, with conversation context and grounded readable results. Added real connection status/setup guidance, planner, navigation, local imports/edits/skips, manual handoff, schedules, ideas, media metadata, history, analytics and reviewed setting changes.
+- Typed yes/no is bound to one displayed request ID and content checksum. Exact text/account checks and single-use consumption remain enforced. A confirmed publish action approves and sends only that reviewed version. The model has no confirmation tool.
+- Added persistent activity state across screens, session reports and structured stored Terminal completion reports with next-step links. Failed, stopped, waiting and completed states are distinct.
+- Full current regression suite: 86 tests passed in 79.030 seconds. Three UI checks passed, including network/error boundaries, stream parsing, multi-action confirmation, work-state tracking and outcome links.
+- Live installed acceptance recorded 68 checks: 58 passed, 10 failed/blocked assertions traced to ChatGPT app-usage limits and X access/credits. Account profile, local screens, deterministic Terminal controls, import, watchlist, ideas, local media/resize, manual scheduling/cancellation, history and exports passed.
+- ChatGPT later returned subscription_sharing_usage_limit_exceeded. A new live weekly plan, AI reply and natural-language routing could not complete under that allowance. Earlier completed ChatGPT inference remains documented below; it does not override the current usage limit. No API-key fallback was used.
+- One explicitly authorized labeled public-post test went through the exact preview and typed yes flow. X rejected it for credits/access. Zero public posts were created; dependent self-reply and quote tests were not attempted. Local test drafts 2 and 3 remain visible; the test reminder is cancelled. Temporary test media/idea/watch records were removed.
+- No additional database migration or dependency was needed. New modules: app/planner.py and app/terminal_feedback.py. New checks: tests/test_planner_feedback.py, tests/test_terminal_control.py, scripts/check_feedback.cjs and the explicit opt-in scripts/live_acceptance.py. Existing command bus/tools, routes, provider errors, static action handlers, template, CSS and documentation were extended.
+- Local live result detail: artifacts/live-acceptance.json. It contains outcomes and test IDs, not credentials. The live publishing script requires both an opt-in flag and a matching expected account username and never runs in the automatic test suite.
 
 ## Delivered architecture
 
@@ -17,7 +31,7 @@ The original FastAPI backend and plain JavaScript/CSS interface were extended. T
 
 ## Connection and capability status
 
-The connected X account was verified through the official profile endpoint at the user's request. One real recent-search attempt returned HTTP 402 and correctly activated the persisted web-search fallback. An announcement was saved locally for approval. Subsequent user-initiated publishing attempts are recorded as rejected for credits/access, with no confirmed published ID. No social publishing was performed by the development tests.
+The connected X account was verified through the official profile endpoint at the user's request. One real recent-search attempt returned HTTP 402 and correctly activated the persisted web-search fallback. An announcement was saved locally for approval. Subsequent user-initiated publishing attempts are recorded as rejected for credits/access, with no confirmed published ID. The later explicitly authorized live publishing test was attempted and rejected by X; no public post was created.
 
 The official adapters are implemented and mocked at their external boundaries. Live access still requires each user's independent platform OAuth registration, approved scopes, account type, and any required credits. See [the exact capability matrix](SOCIAL-PROVIDERS.md).
 
@@ -206,3 +220,4 @@ The following manifest compares the finished workspace with the original public-
     M	app/x_api.py
     M	requirements.txt
     M	tests/test_workflow.py
+

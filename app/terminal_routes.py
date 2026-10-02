@@ -60,6 +60,8 @@ async def run_command(data,queue):
                     (",".join(a.tool for a in plan.actions),json.dumps(bus.redact([a.model_dump() for a in plan.actions])),risk,
                      risk in {"EXTERNAL_ACTION","DESTRUCTIVE"},data.id))
                 result=await bus.execute_plan(plan,data.id,emit)
+            from .terminal_feedback import completion_report
+            result["report"]=completion_report(result)
             db.execute("UPDATE terminal_commands SET status='completed',finished_at=?,result=? WHERE id=?",(db.now(),json.dumps(bus.redact(result)),data.id))
             emit({"type":"result",**result})
     except asyncio.CancelledError:

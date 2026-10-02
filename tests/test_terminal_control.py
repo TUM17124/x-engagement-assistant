@@ -25,10 +25,16 @@ class TerminalControlTests(AppTest):
         events=self.run_command('publish '+str(draft['id']))
         approval=next(e['request'] for e in events if e['type']=='approval')
         self.assertIn(draft['text'],approval['snapshot'])
+        report=next(e['report'] for e in events if e['type']=='result')
+        self.assertEqual(report['state'],'waiting')
+        self.assertIn('Nothing has been sent',report['message'])
         self.assertEqual(ws.get_draft(draft['id'])['status'],'draft')
         with patch.object(x_api,'create_post',AsyncMock(return_value={'data':{'id':'999000111'}})) as send:
             done=self.run_command('yes',approval_id=approval['id'],approval_checksum=approval['checksum'])
             self.assertTrue(any('Published successfully' in e.get('message','') for e in done))
+            report=next(e['report'] for e in done if e['type']=='result')
+            self.assertEqual(report['state'],'completed')
+            self.assertEqual(report['suggestions'][0]['url'],'#history')
             self.run_command('yes',approval_id=approval['id'],approval_checksum=approval['checksum'])
             send.assert_awaited_once_with(draft['text'])
         self.assertEqual(ws.get_draft(draft['id'])['status'],'published')
@@ -78,3 +84,11 @@ class TerminalControlTests(AppTest):
             await bus.execute_plan(plan,None,lambda e:None)
         asyncio.run(check())
         self.assertEqual(db.one('SELECT topics FROM social_watch')['topics'],'AI, programming')
+
+    def test_completion_report_points_to_inbox_for_new_draft(self):
+        from app.terminal_feedback import completion_report
+        draft=self.draft(text='Ready for review')
+        report=completion_report({'success':True,'data':[{'tool':'content.draftPost','result':draft}]})
+        self.assertEqual(report['state'],'completed')
+        self.assertIn('waiting for your review in Response Inbox',report['message'])
+        self.assertEqual(report['suggestions'][0]['url'],'#queue')
