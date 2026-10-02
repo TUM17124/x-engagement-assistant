@@ -5,6 +5,8 @@ use tauri_plugin_shell::{ShellExt, process::CommandChild};
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_notification::NotificationExt;
 
+mod updates;
+
 struct Backend { child: Mutex<Option<CommandChild>>, token: String, tray_enabled: Arc<AtomicBool> }
 fn client() -> reqwest::blocking::Client {
     reqwest::blocking::Client::builder().timeout(Duration::from_secs(3)).build().expect("HTTP client")
@@ -17,6 +19,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let token=uuid::Uuid::new_v4().to_string();
             let tray_enabled=Arc::new(AtomicBool::new(false));
@@ -120,6 +123,11 @@ fn main() {
                             for event in events {
                                 if let Some(title)=event["title"].as_str() {let _=handle.notification().builder().title("Social Engagement Command Center").body(title).show();}
                             }
+                        }
+                    }
+                    if let Ok(response)=http.get("http://127.0.0.1:8787/desktop/update-request").header("X-Desktop-Token",&token).send() {
+                        if let Ok(job)=response.json::<serde_json::Value>() {
+                            if job["state"].as_str()==Some("downloading") { updates::run(handle.clone(),token.clone(),job); }
                         }
                     }
                     std::thread::sleep(Duration::from_secs(10));

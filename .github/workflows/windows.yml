@@ -32,7 +32,7 @@ jobs:
       - run: python scripts/build_backend.py
       - run: python scripts/smoke_backend.py src-tauri/binaries/xea-backend-x86_64-pc-windows-msvc.exe
       - run: python scripts/collect_notices.py
-      - run: npm run desktop:build
+      - run: npm run desktop:build -- --config src-tauri/tauri.ci.conf.json
       - name: Package installer and checksum
         shell: pwsh
         run: |

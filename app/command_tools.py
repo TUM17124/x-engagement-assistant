@@ -198,7 +198,7 @@ def trends(_):return social.trends()
 
 @tool("content.draftReply","Create one review-only draft for an imported post. Existing drafts are reused.",DraftReply,Permission.DRAFT,automation_allowed=True)
 async def draft_reply(a):
-    existing=db.one("SELECT id FROM drafts WHERE feed_id=? ORDER BY id DESC LIMIT 1",(a.post_id,))
+    existing=db.one("SELECT id FROM drafts WHERE feed_id=? AND status<>'deleted' ORDER BY id DESC LIMIT 1",(a.post_id,))
     if existing:return {"message":"This post already has a draft; edit or regenerate it in Response Inbox.","draft":ws.get_draft(existing["id"])}
     return await social.analyze(a.post_id,a.style)
 
@@ -321,20 +321,43 @@ class IdeaInput(Args):
 class EditDraft(DraftID):
     text:str=Field(min_length=1,max_length=20000)
 class SafeSettings(Args):
-    interests:list[str]|None=None
+    interests:list[str]|None=Field(default=None,max_length=50)
     theme:Literal["dark","dim"]|None=None
     notifications:bool|None=None
-    ai_provider:Literal["chatgpt","gemini","openai","compatible","ollama"]|None=None
+    ai_provider:Literal["chatgpt","gemini","openai","compatible","ollama","grok","claude","kimi","deepseek"]|None=None
+    ai_model:str|None=Field(default=None,max_length=200)
+    chatgpt_model:str|None=Field(default=None,max_length=200)
+    ai_base_url:str|None=Field(default=None,max_length=2048)
+    discovery_mode:Literal["automatic","api","web"]|None=None
+    daily_search_limit:int|None=Field(default=None,ge=1,le=1000)
+    daily_reply_limit:int|None=Field(default=None,ge=1,le=1000)
+    daily_post_limit:int|None=Field(default=None,ge=1,le=1000)
+    daily_write_cap:int|None=Field(default=None,ge=1,le=1000)
+    hourly_write_limit:int|None=Field(default=None,ge=1,le=100)
+    daily_ai_limit:int|None=Field(default=None,ge=1,le=1000)
+    same_account_limit:int|None=Field(default=None,ge=1,le=20)
+    social_daily_request_cap:int|None=Field(default=None,ge=1,le=1000)
+    social_max_feed:int|None=Field(default=None,ge=20,le=1000)
+    poll_minutes:int|None=Field(default=None,ge=15,le=1440)
+    assistant_mode:bool|None=None
+    monitoring:bool|None=None
+    read_access:bool|None=None
+    tray_enabled:bool|None=None
+    check_updates:bool|None=None
+    notify_priority:bool|None=None
+    notify_mentions:bool|None=None
+    notify_connections:bool|None=None
+    default_query:str|None=Field(default=None,max_length=512)
 
 @tool("system.open","Navigate to an application screen; uploads and credentials use secure GUI forms.",Page)
 def open_page(a):return {"navigate":a.page,"open_page":True,"message":"Opening "+a.page+"."}
 
-@tool("settings.update","Review changes to interests, appearance, notifications or AI provider. Never accepts secrets.",SafeSettings,Permission.EXTERNAL_ACTION)
+@tool("settings.update","Review local safety limits, discovery, monitoring, model, appearance and notifications. Platform quotas and approval protection cannot be overridden. Never accepts secrets.",SafeSettings,Permission.EXTERNAL_ACTION)
 def update_settings(a):
     values=a.model_dump(exclude_none=True)
     if not values:raise ValueError("Choose at least one setting to change.")
     prefs.save(values)
-    return {"message":"Settings updated.","settings":values}
+    return {"message":"Settings updated."+(" Open Settings > AI Provider to choose an available model and save its API key securely. No provider fallback will occur." if "ai_provider" in values else ""),"settings":values}
 
 @tool("content.weeklyPlan","Generate and save a seven-day plan using the same AI Planner service.",PlanInput,Permission.DRAFT)
 async def plan_week(a):
@@ -380,3 +403,220 @@ def ideas_delete(a):return content.delete_idea(a.id)
 
 @tool("media.list","List local media metadata. To upload a file, open the Media screen.")
 def media_list(_):return db.rows("SELECT id,name,mime,size,width,height FROM media ORDER BY created_at DESC LIMIT 100")
+
+
+# Extended controls reuse the same services as the GUI. No SQL, shell or secret tools.
+from .profile import ProfilePatch,get_profile,save_profile
+
+@tool("profile.read","Read the structured My Profile record.")
+def profile_read(_):return get_profile()
+
+@tool("profile.update","Update named My Profile fields. Omitted fields remain unchanged; empty text clears a field.",ProfilePatch,Permission.EXTERNAL_ACTION)
+def profile_update(a):return {"message":"Profile saved","profile":save_profile(a)}
+
+@tool("profile.clear","Clear all My Profile fields, after confirmation.",permission=Permission.DESTRUCTIVE)
+def profile_clear(_):return {"message":"Profile cleared. Writing preferences and credentials are unchanged.","profile":save_profile(ProfilePatch(**{k:"" for k in ProfilePatch.model_fields}))}
+
+@tool("settings.read","Inspect editable non-secret settings and approval protections.")
+def settings_read(_):
+    return {**{k:prefs.get(k) for k in SafeSettings.model_fields},"require_approval":True,"never_auto_reply":True}
+
+@tool("system.limits","Explain current local usage and provider pauses. Limits use UTC; platform quotas are separate.")
+def limits(_):
+    from .storage import action_count_today
+    day=db.now()[:10]
+    return {"limits":{k:prefs.get(k) for k in prefs.BOUNDS},"writes_today":action_count_today(),
+        "ai_requests_today":db.one("SELECT COUNT(*) n FROM ai_usage WHERE substr(created_at,1,10)=?",(day,))["n"],
+        "searches_today":db.one("SELECT COUNT(*) n FROM search_usage WHERE substr(created_at,1,10)=?",(day,))["n"],
+        "ai_pause":db.get_setting("ai_pause",{}),
+        "message":"These are local safety limits. Ask to change a named limit for a confirmation preview. X/AI billing, permission and usage limits must be resolved with that provider. Duplicate protection and human approval remain on."}
+
+@tool("content.check","Check an existing draft for local limits, duplicate content and publishability without sending.",DraftID)
+def check_draft(a):
+    draft=ws.get_draft(a.draft_id)
+    if draft["status"] in {"published","sending","uncertain","partial"}:
+        return {"allowed":False,"message":"This draft is already published, being sent, or needs reconciliation. Check History before taking another action."}
+    try:ws.safety(draft)
+    except ValueError as error:return {"allowed":False,"message":str(error)+" Nothing was sent. Use show limits or edit this draft."}
+    return {"allowed":True,"message":"Local content and safety checks passed. Publishing still requires approval and valid platform access; no API request was made."}
+
+@tool("content.deleteDraft","Delete an unpublished draft and cancel its schedule. Keep activity and duplicate-protection records.",DraftID,Permission.DESTRUCTIVE)
+async def delete_draft(a):
+    from .local_controls import delete_draft as remove
+    return await remove(a.draft_id)
+
+class FeedState(Item):
+    state:Literal["save","unsave","ignore","restore"]
+@tool("feed.list","Read locally stored feed items; never performs a paid API search.")
+def feed_list(_):return db.rows("SELECT * FROM feed_items ORDER BY imported_at DESC LIMIT 100")
+@tool("feed.update","Save, unsave, ignore or restore a local feed item.",FeedState,Permission.DRAFT)
+def feed_update(a):
+    if not db.one("SELECT id FROM feed_items WHERE id=?",(a.post_id,)):raise ValueError("Feed item not found.")
+    column="saved" if a.state in {"save","unsave"} else "ignored"
+    db.execute("UPDATE feed_items SET "+column+"=? WHERE id=?",(int(a.state in {"save","ignore"}),a.post_id))
+    return {"message":"Feed item updated: "+a.state+"."}
+
+class WatchEdit(NumericID):
+    topics:str|None=Field(default=None,max_length=500)
+    priority:Literal["Low","Normal","High"]|None=None
+    enabled:bool|None=None
+    notifications:bool|None=None
+    auto_draft:bool|None=None
+@tool("watchlist.update","Edit a watched account's topics, priority and monitoring/drafting preferences. Enabling monitoring can use API credits.",WatchEdit,Permission.EXTERNAL_ACTION)
+def watch_edit(a):
+    current=db.one("SELECT * FROM social_watch WHERE id=?",(a.id,))
+    if not current:raise ValueError("Watched account not found.")
+    return content.save_watch({**current,**a.model_dump(exclude_none=True,exclude={"id"})})
+
+class TopicData(Args):
+    name:str=Field(min_length=1,max_length=100)
+    keywords:str=Field(min_length=1,max_length=1000)
+    excluded:str=Field(default="",max_length=500)
+    languages:str=Field(default="en",max_length=100)
+    enabled:bool=False
+    priority:Literal["Low","Normal","High"]="Normal"
+    query:str=Field(default="",max_length=2000)
+class TopicEdit(TopicData):
+    id:int=Field(ge=1)
+@tool("topics.list","List tracked discovery topics and their search links.")
+def topics_list(_):
+    from .workspace_routes import topics
+    return topics()
+@tool("topics.create","Create a tracked topic. Enabling automatic discovery may use paid API reads.",TopicData,Permission.EXTERNAL_ACTION)
+def topics_create(a):
+    from .workspace_routes import add_topic,TopicInput
+    return add_topic(TopicInput(**a.model_dump()))
+@tool("topics.update","Replace a tracked topic's settings after review.",TopicEdit,Permission.EXTERNAL_ACTION)
+def topics_update(a):
+    from .workspace_routes import edit_topic,TopicInput
+    if not db.one("SELECT id FROM tracked_topics WHERE id=?",(a.id,)):raise ValueError("Topic not found.")
+    return edit_topic(a.id,TopicInput(**a.model_dump(exclude={"id"})))
+@tool("topics.delete","Delete a tracked topic; keep previously imported posts.",NumericID,Permission.DESTRUCTIVE)
+def topics_delete(a):
+    from .workspace_routes import delete_topic
+    return delete_topic(a.id)
+
+class MediaID(Args):
+    id:str=Field(min_length=1,max_length=100)
+class MediaEdit(MediaID):
+    tags:str|None=Field(default=None,max_length=4000)
+    folder:str|None=Field(default=None,max_length=4000)
+    favorite:bool|None=None
+    caption:str|None=Field(default=None,max_length=4000)
+    alt_text:str|None=Field(default=None,max_length=4000)
+@tool("media.update","Edit local media tags, folder, caption or alt text. Alt-text changes invalidate affected approvals.",MediaEdit,Permission.EXTERNAL_ACTION)
+async def media_update(a):
+    from .media_routes import update
+    return await update(a.id,a.model_dump(exclude_none=True,exclude={"id"}))
+@tool("media.delete","Delete a local media file. Active drafts referencing it must be edited first.",MediaID,Permission.DESTRUCTIVE)
+def media_delete(a):
+    from .media_routes import delete
+    return delete(a.id)
+
+class ContextPatch(Args):
+    section:Literal["voice","brand_voice","product"]
+    fields:dict[str,str]
+@tool("settings.context","Update writing voice, brand voice or product context, preserving unspecified fields. No credentials.",ContextPatch,Permission.EXTERNAL_ACTION)
+def context_update(a):
+    from .local_controls import context_patch
+    return context_patch(a.section,a.fields)
+
+class ApprovalID(Args):
+    id:str=Field(min_length=1,max_length=100)
+@tool("approvals.reject","Reject one pending action preview without executing it.",ApprovalID,Permission.DRAFT)
+def reject_action(a):
+    from .command_bus import reject_request
+    if not db.one("SELECT id FROM action_requests WHERE id=? AND status='pending'",(a.id,)):raise ValueError("Pending approval not found.")
+    return reject_request(a.id)
+
+
+class SettingSection(Args):
+    section:Literal["accounts","memory","brand","usage","x","ai","voice","product","appearance","safety","data","updates"]
+@tool("settings.open","Open a named Settings section, including secure credential forms.",SettingSection)
+def settings_open(a):return {"navigate":"settings","settings_tab":a.section,"open_page":True,"message":"Opening Settings > "+a.section+"."}
+@tool("settings.readContext","Read current writing voice, brand voice and product fields.")
+def read_context(_):return {k:prefs.get(k) for k in ("voice","brand_voice","product")}
+@tool("ai.test","Test only the explicitly selected AI provider; never switch to a paid fallback.",rate_limit=6)
+async def ai_test(_):
+    from .main import test_ai
+    await test_ai()
+    return {"message":"Connection test passed for "+prefs.get("ai_provider")+"."}
+@tool("planner.read","Read the most recently saved AI content plan.")
+def read_plan(_):return db.get_setting("last_weekly_plan",{})
+@tool("market.read","Summarize available local competitor content; no unauthorized fetching.")
+def read_market(_):return content.market()
+@tool("brief.read","Read today's local activity and suggested review priorities.")
+def brief_read(_):return social.brief()
+
+class SaveDraft(Platform):
+    text:str=Field(min_length=1,max_length=20000)
+    kind:Literal["original","thread","quote","reply","comment"]="original"
+    feed_id:str|None=None
+    media_ids:list[str]=Field(default_factory=list,max_length=4)
+@tool("content.saveDraft","Save the user's supplied text and attachments as an unpublished draft. No AI usage.",SaveDraft,Permission.DRAFT)
+def save_local_draft(a):return content.create_draft(content.Draft(**a.model_dump()))
+class AttachMedia(DraftID):
+    media_ids:list[str]=Field(max_length=4)
+@tool("content.attachMedia","Replace an editable draft's local media attachments; clears prior approval.",AttachMedia,Permission.EXTERNAL_ACTION)
+def attach_media(a):
+    d=ws.get_draft(a.draft_id)
+    return content.edit_draft(a.draft_id,content.Draft(platform=d["platform"],kind=d["kind"],feed_id=d["feed_id"],text=d["text"],media_ids=a.media_ids))
+class CopyDraft(DraftID,Platform):pass
+@tool("content.copyDraft","Copy content into a new unapproved version for another platform. Duplicate checks still apply on publish.",CopyDraft,Permission.DRAFT)
+def copy_draft(a):return content.duplicate(a.draft_id,{"platform":a.platform})
+
+class MuteInput(Args):
+    kind:Literal["author","topic"]
+    value:str=Field(min_length=1,max_length=100)
+@tool("mutes.list","List ignored authors and topics.")
+def mutes_list(_):
+    from .workspace_routes import mutes
+    return {**mutes(),"social_authors":db.rows("SELECT * FROM social_mutes")}
+@tool("mutes.add","Mute an author or topic in X discovery.",MuteInput,Permission.DRAFT)
+def mute_add(a):
+    from .workspace_routes import mute
+    return mute(a.kind,{"value":a.value})
+@tool("mutes.remove","Unmute an author or topic in X discovery.",MuteInput,Permission.DRAFT)
+def mute_remove(a):
+    from .workspace_routes import unmute
+    return unmute(a.kind,{"value":a.value})
+class SocialMute(Platform):
+    author:str=Field(min_length=1,max_length=150)
+    muted:bool=True
+@tool("social.mute","Mute or unmute a named author on one platform.",SocialMute,Permission.DRAFT)
+def social_mute(a):
+    if a.muted:return content.mute(a.model_dump())
+    db.execute("DELETE FROM social_mutes WHERE platform=? AND author=?",(a.platform,a.author.lower()))
+    return {"message":"Author unmuted."}
+
+class MediaTransform(MediaID):
+    width:int=Field(ge=1,le=8192)
+    height:int=Field(ge=1,le=8192)
+    crop:list[int]|None=Field(default=None,min_length=4,max_length=4)
+@tool("media.transform","Create a cropped/resized copy; preserve the original media.",MediaTransform,Permission.DRAFT)
+def transform_media(a):
+    from .media_routes import transform
+    return transform(a.id,a.model_dump(exclude={"id"}))
+class MediaAssist(MediaID):
+    instruction:str=Field(default="Suggest accurate alt text and caption ideas.",max_length=1000)
+@tool("media.assist","Send a chosen image to the configured AI for caption or alt-text suggestions.",MediaAssist,Permission.EXTERNAL_ACTION,rate_limit=10)
+async def assist_media(a):
+    from .media_routes import assist
+    return await assist(a.id,{"instruction":a.instruction})
+class ImagePrompt(Args):
+    prompt:str=Field(min_length=1,max_length=4000)
+@tool("media.generate","Generate a local image with the separately configured image provider; may incur image API charges.",ImagePrompt,Permission.EXTERNAL_ACTION,rate_limit=10)
+async def generate_image(a):
+    from .media_routes import generate
+    return await generate({"prompt":a.prompt})
+class IdeaEdit(IdeaInput):
+    id:int=Field(ge=1)
+@tool("ideas.update","Edit a saved local idea.",IdeaEdit,Permission.DRAFT)
+def edit_idea(a):
+    if not db.one("SELECT id FROM ideas WHERE id=?",(a.id,)):raise ValueError("Idea not found.")
+    db.execute("UPDATE ideas SET title=?,text=? WHERE id=?",(a.title,a.text,a.id))
+    return {"message":"Idea updated."}
+class ExportKind(Args):
+    kind:Literal["settings","drafts","history","database"]
+@tool("data.export","Prepare a local download link for data, excluding credential secrets.",ExportKind)
+def export_link(a):return {"message":"Use the download link to export "+a.kind+". Treat your local drafts and history as private.","download_url":"/api/export/"+a.kind}

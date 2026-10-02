@@ -1,11 +1,15 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert'),path=require('path');
-const files=['app','settings','feed','screens','actions','accounts','social','social-actions','terminal','forms'];
+const files=['app','settings','feed','screens','actions','accounts','social','social-actions','terminal','updates','forms'];
 for(const file of files)new vm.Script(fs.readFileSync(path.join('app/static',file+'.js'),'utf8'),{filename:file+'.js'});
 const context={console,URLSearchParams,FormData,Date,setTimeout,clearTimeout,
 document:{addEventListener(){},querySelector(){return null}},window:{addEventListener(){}},location:{hash:''}};
 vm.createContext(context);
 for(const file of files.slice(0,-1))vm.runInContext(fs.readFileSync(path.join('app/static',file+'.js'),'utf8'),context);
 vm.runInContext(`
+updateState={current_version:'0.3.1',release:{available:true,version:'0.3.2',signed:true,notes:'<script>bad</script>'},desktop:true};
+if(!updatesPage().includes('Update to 0.3.2'))throw Error('Signed update action missing');
+if(updatesPage().includes('<script>'))throw Error('Release notes must be escaped');
+if(!updatesPage().includes('Get free email updates'))throw Error('Email signup missing');
 settingsTab='x';
 config={ai_provider:'gemini',ai_model:'test-model',interests:[],theme:'dark',default_query:'PDF',discovery_mode:'automatic',daily_search_limit:20};
 if(!settingsPage({authors:[],topics:[]}).includes('Discovery Mode'))throw Error('Discovery Mode missing');

@@ -5,6 +5,7 @@ from . import database as db
 from .secrets import store, PUBLIC_SECRET_NAMES
 
 DEFAULTS = {
+    "check_updates": True, "claude_workspace_id": "",
     "assistant_mode": False, "social_daily_request_cap": 100, "social_max_feed": 200,
     "my_profile": {}, "brand_voice": {}, "image_provider": {},
     "notify_priority": True, "notify_mentions": True, "notify_connections": True,
@@ -49,7 +50,7 @@ def save(values, persist=True):
                 raise ValueError("Profile fields must be text, up to 4000 characters.")
         if key == "interests" and (not isinstance(value, list) or len(value) > 50 or any(not isinstance(x,str) or len(x)>100 for x in value)):
             raise ValueError("Enter up to 50 short interests.")
-        if key == "ai_provider" and value not in {"chatgpt","gemini","openai","compatible","ollama"}:
+        if key == "ai_provider" and value not in {"chatgpt","gemini","openai","compatible","ollama","grok","claude","kimi","deepseek"}:
             raise ValueError("Choose a supported AI provider.")
         if key == "discovery_mode" and value not in {"automatic","api","web"}:
             raise ValueError("Choose Automatic, X API Search, or X Web Search.")

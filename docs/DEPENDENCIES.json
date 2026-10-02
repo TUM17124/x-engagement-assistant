@@ -301,6 +301,12 @@
   },
   {
     "ecosystem": "Rust",
+    "name": "arbitrary",
+    "version": "1.4.2",
+    "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
     "name": "async-broadcast",
     "version": "0.7.2",
     "license": "MIT OR Apache-2.0"
@@ -596,6 +602,12 @@
   {
     "ecosystem": "Rust",
     "name": "core-foundation",
+    "version": "0.9.4",
+    "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "core-foundation",
     "version": "0.10.1",
     "license": "MIT OR Apache-2.0"
   },
@@ -723,6 +735,12 @@
     "ecosystem": "Rust",
     "name": "deranged",
     "version": "0.5.8",
+    "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "derive_arbitrary",
+    "version": "1.4.2",
     "license": "MIT OR Apache-2.0"
   },
   {
@@ -898,6 +916,12 @@
     "name": "field-offset",
     "version": "0.3.6",
     "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "filetime",
+    "version": "0.2.29",
+    "license": "MIT/Apache-2.0"
   },
   {
     "ecosystem": "Rust",
@@ -1387,6 +1411,18 @@
   },
   {
     "ecosystem": "Rust",
+    "name": "jni",
+    "version": "0.22.4",
+    "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "jni-macros",
+    "version": "0.22.4",
+    "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
     "name": "jni-sys",
     "version": "0.3.1",
     "license": "MIT OR Apache-2.0"
@@ -1522,6 +1558,12 @@
     "name": "mime",
     "version": "0.3.17",
     "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "minisign-verify",
+    "version": "0.2.5",
+    "license": "MIT"
   },
   {
     "ecosystem": "Rust",
@@ -1693,6 +1735,12 @@
   },
   {
     "ecosystem": "Rust",
+    "name": "objc2-osa-kit",
+    "version": "0.3.2",
+    "license": "Zlib OR Apache-2.0 OR MIT"
+  },
+  {
+    "ecosystem": "Rust",
     "name": "objc2-quartz-core",
     "version": "0.3.2",
     "license": "Zlib OR Apache-2.0 OR MIT"
@@ -1729,6 +1777,12 @@
   },
   {
     "ecosystem": "Rust",
+    "name": "openssl-probe",
+    "version": "0.2.1",
+    "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
     "name": "option-ext",
     "version": "0.2.0",
     "license": "MPL-2.0"
@@ -1744,6 +1798,12 @@
     "name": "os_pipe",
     "version": "1.2.3",
     "license": "MIT"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "osakit",
+    "version": "0.3.1",
+    "license": "MIT OR Apache-2.0"
   },
   {
     "ecosystem": "Rust",
@@ -2101,8 +2161,26 @@
   },
   {
     "ecosystem": "Rust",
+    "name": "rustls-native-certs",
+    "version": "0.8.4",
+    "license": "Apache-2.0 OR ISC OR MIT"
+  },
+  {
+    "ecosystem": "Rust",
     "name": "rustls-pki-types",
     "version": "1.15.1",
+    "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "rustls-platform-verifier",
+    "version": "0.7.1",
+    "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "rustls-platform-verifier-android",
+    "version": "0.2.0",
     "license": "MIT OR Apache-2.0"
   },
   {
@@ -2128,6 +2206,12 @@
     "name": "same-file",
     "version": "1.0.6",
     "license": "Unlicense/MIT"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "schannel",
+    "version": "0.1.29",
+    "license": "MIT"
   },
   {
     "ecosystem": "Rust",
@@ -2157,6 +2241,18 @@
     "ecosystem": "Rust",
     "name": "scopeguard",
     "version": "1.2.0",
+    "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "security-framework",
+    "version": "3.7.0",
+    "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "security-framework-sys",
+    "version": "2.17.0",
     "license": "MIT OR Apache-2.0"
   },
   {
@@ -2305,6 +2401,12 @@
   },
   {
     "ecosystem": "Rust",
+    "name": "simd_cesu8",
+    "version": "1.2.0",
+    "license": "Apache-2.0 OR MIT"
+  },
+  {
+    "ecosystem": "Rust",
     "name": "simdutf8",
     "version": "0.1.5",
     "license": "MIT OR Apache-2.0"
@@ -2419,6 +2521,18 @@
   },
   {
     "ecosystem": "Rust",
+    "name": "system-configuration",
+    "version": "0.7.0",
+    "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "system-configuration-sys",
+    "version": "0.6.0",
+    "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
     "name": "system-deps",
     "version": "6.2.2",
     "license": "MIT OR Apache-2.0"
@@ -2433,6 +2547,12 @@
     "ecosystem": "Rust",
     "name": "tao-macros",
     "version": "0.1.4",
+    "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "tar",
+    "version": "0.4.46",
     "license": "MIT OR Apache-2.0"
   },
   {
@@ -2493,6 +2613,12 @@
     "ecosystem": "Rust",
     "name": "tauri-plugin-single-instance",
     "version": "2.5.2",
+    "license": "Apache-2.0 OR MIT"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "tauri-plugin-updater",
+    "version": "2.13.1",
     "license": "Apache-2.0 OR MIT"
   },
   {
@@ -2893,6 +3019,12 @@
   },
   {
     "ecosystem": "Rust",
+    "name": "webpki-root-certs",
+    "version": "1.0.9",
+    "license": "CDLA-Permissive-2.0"
+  },
+  {
+    "ecosystem": "Rust",
     "name": "webpki-roots",
     "version": "1.0.9",
     "license": "CDLA-Permissive-2.0"
@@ -2991,6 +3123,12 @@
     "ecosystem": "Rust",
     "name": "windows-numerics",
     "version": "0.3.1",
+    "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "windows-registry",
+    "version": "0.6.1",
     "license": "MIT OR Apache-2.0"
   },
   {
@@ -3193,6 +3331,12 @@
   },
   {
     "ecosystem": "Rust",
+    "name": "xattr",
+    "version": "1.6.1",
+    "license": "MIT OR Apache-2.0"
+  },
+  {
+    "ecosystem": "Rust",
     "name": "yoke",
     "version": "0.8.3",
     "license": "Unicode-3.0"
@@ -3274,6 +3418,12 @@
     "name": "zerovec-derive",
     "version": "0.11.6",
     "license": "Unicode-3.0"
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "zip",
+    "version": "4.6.1",
+    "license": "MIT"
   },
   {
     "ecosystem": "Rust",

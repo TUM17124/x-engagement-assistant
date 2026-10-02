@@ -8,6 +8,8 @@ AI helps discover, summarize, rank, draft, and organize. You review, edit, and a
 
 ## Install and start
 
+[**Download for Windows**](https://github.com/TUM17124/x-engagement-assistant/releases/latest/download/Social-Engagement-Command-Center-Setup.exe) ? [Release notes](https://github.com/TUM17124/x-engagement-assistant/releases/latest) ? [Source code](https://github.com/TUM17124/x-engagement-assistant)
+
 Windows is the first supported desktop target. Run the NSIS installer from a tested release/build, launch **Social Engagement Command Center**, and complete onboarding. End users do not install Python, Node.js, Rust, or Git and do not edit an environment file.
 
 1. Choose **Continue with ChatGPT**, or explicitly select another AI provider.
@@ -16,7 +18,13 @@ Windows is the first supported desktop target. Run the NSIS installer from a tes
 4. Add interests and watched accounts.
 5. Open **AI Terminal**, enter **help**, and review drafts in Response Inbox / Approval Center.
 
-This development release is unsigned. See [BUILD.md](docs/BUILD.md). A public installer exists only when it appears on the repository's Releases page.
+The installer has a Tauri updater signature but does not yet have a Windows Authenticode certificate; Windows may show an unknown-publisher warning. See [BUILD.md](docs/BUILD.md).
+
+## Updates and free email alerts
+
+Open **Updates** in the top bar to check GitHub releases, review notes, and approve installation. Updates preserve your local workspace and require no Git or terminal. Background checks are optional; nothing installs silently.
+
+Choose **Get free email updates** to open the free Blogtrottr signup with our release feed prefilled. Enter your email there and complete its verification. No sender account or API key is needed. The service is ad-supported and sends updates even when the app is closed; this app does not collect your email. [Details and unsubscribe instructions](docs/UPDATES.md).
 
 ## What you can do
 
@@ -147,3 +155,39 @@ Do not run development and desktop servers on port 8787 simultaneously.
 See [architecture](docs/ARCHITECTURE.md), [build instructions](docs/BUILD.md), [provider guide](docs/SOCIAL-PROVIDERS.md), [contributing](CONTRIBUTING.md), and [credential model](docs/SECURITY.md).
 
 MIT licensed. Dependencies retain their own licenses; see [license notes](docs/LICENSES.md) and generated third-party notices.
+
+
+### Profile and terminal controls (0.3.1)
+
+Settings > My Profile saves a structured local profile: name, role, bio, industry, expertise, products, audience and goals. Optional fields can be empty. Saved values reload when Settings opens. Individual writing preferences remain separate.
+
+The AI Terminal uses whichever AI provider you explicitly select. It can read and edit profiles, writing context, drafts, media metadata, topics, watchlists and local limits; create drafts, prepare schedules, inspect usage, and request approvals. It cannot reveal credentials, execute arbitrary code, bypass platform quotas or disable human approval. Deleting a local draft cancels its schedule and preserves activity/duplicate protection. Deleting an already-public post is not supported by this control; use the original platform.
+
+Examples that work without an AI call:
+
+```text
+show profile
+set profile bio to I build useful tools for creators
+show settings
+show limits
+set daily ai limit to 100
+save draft A useful observation about building in public.
+edit draft 12 to Revised text for review.
+check draft 12
+delete draft 12
+approve 12
+publish 12
+settings ai
+connect grok
+use claude
+show topics
+export drafts
+```
+
+Commands that change settings, approve publishing or delete items show the exact action first. Type `yes` only after reviewing one pending preview, or `no` to cancel. Natural language uses the same validated tools. A changed target invalidates its pending approval. Basic explicit commands continue to work when AI usage is exhausted.
+
+Grok, Claude, Kimi and DeepSeek connect through official developer APIs in Settings > AI Provider. Follow the provider-console link, create a key, enter an available model, save and test. Keys use the existing OS-protected vault and remain separate for each provider. Claude also supports the optional workspace ID required by multi-workspace keys. These are API connections, not consumer subscription OAuth. Existing ChatGPT plan authorization is unchanged; the app never automatically switches to a chargeable provider.
+
+Official references: [xAI](https://docs.x.ai/developers/quickstart), [Claude authentication](https://platform.claude.com/docs/en/manage-claude/authentication), [Kimi](https://platform.kimi.ai/docs/overview), [DeepSeek](https://api-docs.deepseek.com/).
+
+For local validation diagnostics, set `XEA_DEBUG_VALIDATION=1` in a developer session. Logs include only schema names, field names and error codes, never supplied values or credentials. See [profile/control implementation report](docs/PROFILE-CONTROL-REPORT.md) for exact changes and verification limits.

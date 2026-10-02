@@ -1,5 +1,7 @@
 async function submit(f){
-if(["terminal-form","automation-form","memory-form"].includes(f.id))return terminalSubmit(f);
+if(f.id==='update-settings-form'){await api('/api/settings','PUT',{check_updates:f.elements.check_updates.checked});config.check_updates=f.elements.check_updates.checked;updateState=await api('/api/updates');reportWork({state:'completed',message:'Update check preference saved.'});return render()}
+
+if(["terminal-form","automation-form","writing-preference-form"].includes(f.id))return terminalSubmit(f);
 const d=values(f);
 if(isSocialForm(f))return msSubmit(f);
 if(f.classList.contains('social-account-form')||f.classList.contains('social-callback-form'))return socialAccountSubmit(f);

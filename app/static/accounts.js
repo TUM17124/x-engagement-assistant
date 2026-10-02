@@ -234,12 +234,12 @@ function extendedSettings() {
             "Banned phrases",
           ];
   return (
-    '<form id="memory-form" data-kind="' +
+    '<form id="structured-profile-form" data-kind="' +
     kind +
     '"><h2>' +
     (kind === "my_profile" ? "My Profile" : "Brand Voice") +
     "</h2>" +
-    fields.map((k) => area(k, k, config[kind]?.[k] || "")).join("") +
+    fields.map((k) => {const key=kind==="my_profile"?k.toLowerCase():k;return area(k,key,config[kind]?.[key]||"",'maxlength="'+(kind==="my_profile"?({name:160,role:240,industry:240}[key]||4000):4000)+'"')}).join("") +
     '<button type="submit">Save</button></form>'
   );
 }

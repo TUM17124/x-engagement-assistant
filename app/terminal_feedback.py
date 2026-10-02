@@ -45,6 +45,8 @@ def next_steps(tool,value):
     if tool.startswith("accounts.") or tool.startswith("ai."):return [{"label":"Check connection settings","url":"#settings"}]
     if tool.startswith("scheduler."):return [{"label":"Review Schedule","url":"#schedule"}]
     if tool.startswith("watchlist."):return [{"label":"Set topics and monitoring in Watchlist","url":"#watchlist"}]
+    if tool.startswith("profile.") or tool.startswith("settings.") or tool=="system.limits":return [{"label":"Review Settings","url":"#settings"}]
+    if tool.startswith("topics."):return [{"label":"Review Topic Radar","url":"#topics"}]
     if tool.startswith("ideas."):return [{"label":"Open Ideas","url":"#ideas"}]
     if tool.startswith("media."):return [{"label":"Open Media to choose or edit a file","url":"#media"}]
     if tool.startswith("automations."):return [{"label":"Review automation state and run history","url":"#automations"}]

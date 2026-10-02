@@ -24,7 +24,7 @@ def content_hash(draft):
 
 def get_draft(draft_id):
     value = db.one("SELECT d.*, f.username, f.text source_text, f.id target_id FROM drafts d LEFT JOIN feed_items f ON d.feed_id=f.id WHERE d.id=?", (draft_id,))
-    if not value:
+    if not value or value["status"]=="deleted":
         raise ValueError("Draft not found.")
     return value
 
@@ -69,10 +69,10 @@ def save_draft(kind, text, feed_id=None, generated="", reason="", score=0, topic
     if draft_id:
         current = get_draft(draft_id)
         platform = current.get("platform","x") if platform=="x" else platform
-        if current["status"] in {"sending","published","uncertain","partial"}:
+        if current["status"] in {"sending","published","uncertain","partial","deleted"}:
             raise ValueError("This draft has already been sent or needs reconciliation. Create a new draft.")
         with db.conn() as c:
-            changed=c.execute("UPDATE drafts SET kind=?,text=?,feed_id=?,status='draft',updated_at=? WHERE id=? AND status NOT IN ('sending','published','uncertain','partial')",
+            changed=c.execute("UPDATE drafts SET kind=?,text=?,feed_id=?,status='draft',updated_at=? WHERE id=? AND status NOT IN ('sending','published','uncertain','partial','deleted')",
                       (kind,text,feed_id,db.now(),draft_id)).rowcount
             if not changed:raise ValueError("The draft is already being published or needs reconciliation.")
             if generated:
@@ -115,7 +115,7 @@ async def ai_call(operation):
 async def generate_reply(feed_id, style="", draft_id=None):
     async with REPLY_LOCK:
         if draft_id is None:
-            existing=db.one("SELECT id FROM drafts WHERE feed_id=? AND kind IN ('reply','comment') ORDER BY id DESC LIMIT 1",(feed_id,))
+            existing=db.one("SELECT id FROM drafts WHERE status<>'deleted' AND feed_id=? AND kind IN ('reply','comment') ORDER BY id DESC LIMIT 1",(feed_id,))
             if existing:return get_draft(existing["id"])
         return await _generate_reply(feed_id,style,draft_id)
 
@@ -130,7 +130,7 @@ async def _generate_reply(feed_id, style="", draft_id=None):
     source = {"text":feed["text"],"username":feed["username"],"topic":feed["topic"]}
     if draft_id:
         current = get_draft(draft_id)
-        if current["feed_id"] != feed_id or current["status"] in {"sending","published","uncertain","partial"}:
+        if current["feed_id"] != feed_id or current["status"] in {"sending","published","uncertain","partial","deleted"}:
             raise ValueError("Choose an editable draft for this source.")
         if style:
             source["current_draft"] = current["text"]

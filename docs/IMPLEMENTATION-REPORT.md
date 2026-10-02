@@ -1,4 +1,16 @@
-﻿# Implementation report ? 0.3.0
+ï»¿# Implementation report ? 0.3.0
+
+## Release updates and free email notifications (0.3.1)
+
+- Added app-wide Updates navigation and Settings > Updates & Email.
+- Official GitHub release discovery, optional six-hour checks, ETag caching, persisted throttling, release-note display, explicit installation approval and interrupted-update recovery.
+- Official Tauri updater with a pinned public key and required signed version; private encrypted maintainer signing key lives outside the repository. Native install downloads only the expected repository release, verifies it, backs up SQLite and closes the backend before installer launch.
+- Free Blogtrottr release-feed signup needs no sender account or API configuration. Its real hosted form collects email and performs verification; the app neither collects addresses nor claims subscription/delivery success. The free service includes ads. No test emails were sent.
+- Maintainer packaging verifies signature/version independently, creates a stable installer filename, manifest and checksum, and can publish a draft or public GitHub release using existing Git authorization without printing credentials.
+- Existing social workflows and credentials remain unchanged. No database migration or new Python runtime dependency. Added the official tauri-plugin-updater Rust dependency and refreshed third-party notices.
+- Full 94-test regression run passed, as did all three UI checks, native cargo check and isolated packaged-backend smoke. Additional backup/recovery checks cover updater behavior. Installer and release publication results are reported separately after verification.
+
+
 
 ## Latest Planner, control and feedback update
 
@@ -221,3 +233,7 @@ The following manifest compares the finished workspace with the original public-
     M	requirements.txt
     M	tests/test_workflow.py
 
+
+## 0.3.1 installed verification
+
+Profile saving, expanded terminal controls, additional AI providers, signed release updates and free hosted release-email signup are covered in [the profile/control report](PROFILE-CONTROL-REPORT.md). It includes the exact release file manifest and explicit verification limits. The final Windows installer was installed locally; profile and encrypted credentials were preserved, and the bundled backend hash matched the tested package. No social writes were made.

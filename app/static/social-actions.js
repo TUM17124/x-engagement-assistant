@@ -28,6 +28,12 @@ function suggestionOutput(text) {
   );
 }
 async function msAction(a, id, el) {
+  if(a==='delete-draft'){
+    const draft=socialDrafts.find(d=>d.id===Number(id));
+    if(!draft)throw Error('Reload the inbox and try again.');
+    if(!confirm('Delete this local draft and cancel its schedule?\n\n'+draft.text))return;
+    const result=await api('/api/drafts/'+id,'DELETE');toast(result.message);return render();
+  }
   if (a === "analyze") {
     const d = await api("/api/social/analyze", "POST", { id });
     toast(d.skipped ? "AI skipped this item." : "Response ready for review");
@@ -442,10 +448,16 @@ async function msSubmit(f) {
     toast("Image provider saved");
     return;
   }
-  if (f.id === "memory-form") {
-    await api("/api/settings", "PUT", { [f.dataset.kind]: d });
-    config[f.dataset.kind] = d;
-    toast("Profile saved");
+  if (f.id === "structured-profile-form") {
+    if(f.dataset.kind==="my_profile"){
+      config.my_profile=await api("/api/profile","PUT",d);
+      toast("Profile saved");
+      reportWork({state:"completed",message:"Profile saved"});
+    }else{
+      await api("/api/settings","PUT",{brand_voice:d});config.brand_voice=d;
+      toast("Brand voice saved");
+      reportWork({state:"completed",message:"Brand voice saved"});
+    }
     return;
   }
 }
@@ -460,7 +472,7 @@ const socialFormIds = new Set([
   "image-generation-form",
   "listener-form",
   "image-provider-form",
-  "memory-form",
+  "structured-profile-form",
 ]);
 function isSocialForm(f) {
   return (

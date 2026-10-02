@@ -49,7 +49,7 @@ async def sync(platform:str,data:dict):
 @router.get("/inbox")
 def inbox(tab:str="review",platform:str=""):
     rows=db.rows("""SELECT d.*,f.username,f.text source_text,f.content_kind,f.url source_url,f.source,
-        f.reason opportunity_reason FROM drafts d LEFT JOIN feed_items f ON f.id=d.feed_id ORDER BY d.score DESC,d.id DESC LIMIT 500""")
+        f.reason opportunity_reason FROM drafts d LEFT JOIN feed_items f ON f.id=d.feed_id WHERE d.status<>'deleted' ORDER BY d.score DESC,d.id DESC LIMIT 500""")
     if platform:rows=[d for d in rows if d["platform"]==platform]
     states={"review":{"draft","failed"},"approved":{"approved"},"scheduled":{"scheduled"},"ignored":{"skipped"}}
     if tab in states:return [d for d in rows if d["status"] in states[tab]]

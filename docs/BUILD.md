@@ -17,7 +17,7 @@ From the repository root in PowerShell:
     .\.venv\Scripts\python.exe scripts/build_backend.py
     cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1 > $null
     .\.venv\Scripts\python.exe scripts/collect_notices.py
-    npm run desktop:build
+    npm run desktop:build -- --config src-tauri/tauri.ci.conf.json
 
 If Rust was installed during the current shell session:
 
@@ -27,7 +27,7 @@ The backend output is src-tauri/binaries/xea-backend-x86_64-pc-windows-msvc.exe.
 
 The installer output is:
 
-    src-tauri/target/release/bundle/nsis/Social Engagement Command Center_0.3.0_x64-setup.exe
+    src-tauri/target/release/bundle/nsis/Social Engagement Command Center_0.3.1_x64-setup.exe
 
 Verify the sidecar with isolated data and no external API calls:
 
@@ -56,3 +56,23 @@ Builds are unsigned unless the maintainer configures Authenticode. Packaging doe
 .github/workflows/windows.yml runs mocked tests/UI checks and builds artifacts. GitHub Actions previously could not obtain a runner because of the account's billing/lock state. Local build results are independent of that restriction.
 
 See [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) and [Windows installers](https://v2.tauri.app/distribute/windows-installer/).
+
+
+## Signed public installer
+
+The commands above build an unsigned development installer. The release maintainer uses:
+
+    .\.venv\Scripts\python.exe -B scripts/setup_update_key.py
+    .\.venv\Scripts\python.exe -B scripts/build_backend.py
+    .\scripts\build_signed.ps1
+    .\.venv\Scripts\python.exe -B scripts/package_release.py
+    .\.venv\Scripts\python.exe -B scripts/smoke_backend.py src-tauri/binaries/xea-backend-x86_64-pc-windows-msvc.exe
+
+Commit and push the tested source, then upload a draft or publish the release:
+
+    .\.venv\Scripts\python.exe -B scripts/publish_release.py
+    .\.venv\Scripts\python.exe -B scripts/publish_release.py --publish
+
+Signing keys live outside the repository, with an encrypted private key and an OS-protected password. Do not regenerate the key for an established product or replace published version assets. Forks must change the repository URLs and signing identity before distributing their own builds.
+
+See [Updates and release process](UPDATES.md).

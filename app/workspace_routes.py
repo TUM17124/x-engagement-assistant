@@ -107,10 +107,10 @@ def feed_action(feed_id: str,action: str):
 
 @router.get("/drafts")
 def drafts(kind: str=""):
-    sql="SELECT d.*,f.username,f.text source_text FROM drafts d LEFT JOIN feed_items f ON d.feed_id=f.id"
+    sql="SELECT d.*,f.username,f.text source_text FROM drafts d LEFT JOIN feed_items f ON d.feed_id=f.id WHERE d.status<>'deleted'"
     args=[]
     if kind:
-        sql+=" WHERE d.kind=?";args.append(kind)
+        sql+=" AND d.kind=?";args.append(kind)
     return db.rows(sql+" ORDER BY d.score DESC,d.id DESC LIMIT 200",args)
 
 @router.post("/drafts")
@@ -339,3 +339,9 @@ async def import_legacy(file: UploadFile=File(...)):
         raise ValueError("Maximum legacy database size is 20 MB.")
     async with ws.WRITE_LOCK:
         return import_legacy(data)
+
+
+@router.delete("/drafts/{draft_id}")
+async def delete_local_draft(draft_id:int):
+    from .local_controls import delete_draft
+    return await delete_draft(draft_id)

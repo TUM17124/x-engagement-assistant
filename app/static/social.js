@@ -261,7 +261,7 @@ function responseCard(d) {
         (approved
           ? msButton("Schedule / reminder", "schedule", d.id)
           : "") +
-        btn("Skip", "skip-draft", d.id) +
+        btn("Skip", "skip-draft", d.id) + msButton("Delete draft", "delete-draft", d.id, "ghost danger") +
         '</div><div class="row">' +
         select("Rewrite / regenerate", "social-style-" + d.id, "Humanize", [
           "Humanize",

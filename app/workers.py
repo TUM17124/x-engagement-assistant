@@ -73,7 +73,8 @@ async def monitor_loop():
 async def run_workers():
     recover()
     from .automations import loop as automation_loop
-    tasks=[asyncio.create_task(scheduler_loop()),asyncio.create_task(monitor_loop()),asyncio.create_task(automation_loop())]
+    from .updates import loop as update_loop
+    tasks=[asyncio.create_task(update_loop()),asyncio.create_task(scheduler_loop()),asyncio.create_task(monitor_loop()),asyncio.create_task(automation_loop())]
     try:
         await asyncio.gather(*tasks)
     finally:

@@ -33,7 +33,7 @@ def redact(value):
     text=json.dumps(value,ensure_ascii=True)
     # Never persist credentials accidentally pasted into the terminal or echoed by a model.
     keys=["x_client_secret","x_bearer_token","oauth_tokens","chatgpt_connections"]
-    keys += ["ai_api_key_"+k for k in ("openai","gemini","compatible","ollama")]
+    keys += ["ai_api_key_"+k for k in ("openai","gemini","compatible","ollama","grok","claude","kimi","deepseek")]
     keys += ["social_"+k+"_client_secret" for k in ("facebook","instagram","linkedin","tiktok","youtube","threads")]
     keys += ["social_"+k+"_oauth" for k in ("facebook","instagram","linkedin","tiktok","youtube","threads")]
     def leaves(item):
@@ -53,7 +53,7 @@ def redact(value):
         for secret in values:
             text=text.replace(json.dumps(secret)[1:-1],"[REDACTED]")
     text=re.sub(r"(?i)(Bearer\s+)[A-Za-z0-9._~+/-]{12,}",r"\1[REDACTED]",text)
-    text=re.sub(r"\bsk-[A-Za-z0-9_-]{12,}","[REDACTED]",text)
+    text=re.sub(r"\b(?:sk-|xai-)[A-Za-z0-9_-]{12,}","[REDACTED]",text)
     return json.loads(text)
 
 def safe_input(text):
@@ -62,7 +62,7 @@ def safe_input(text):
         raise ValueError("Do not paste credentials into the terminal. Use secure account Settings.")
     return text.strip()
 
-def action(name,**args):return Plan(actions=[Action(tool=name,arguments=args)])
+def action(tool_name,**args):return Plan(actions=[Action(tool=tool_name,arguments=args)])
 
 def due_time(text,zone):
     tz=ZoneInfo(zone)
@@ -92,7 +92,38 @@ def parse_explicit(raw,zone="UTC"):
       "show drafts":"drafts.list","show approvals":"approvals.list","show automations":"automations.list",
       "show schedule":"scheduler.list","show history":"history.list","show analytics":"analytics.show","show media":"media.list","show ideas":"ideas.list",
       "settings":"system.settings","show memory":"memory.searchPreference","clear memory":"memory.clear"}
+    singles.update({"show profile":"profile.read","my profile":"profile.read","clear profile":"profile.clear",
+        "show settings":"settings.read","show context":"settings.readContext","show mutes":"mutes.list","show plan":"planner.read","show brief":"brief.read","show market":"market.read","test ai":"ai.test","show limits":"system.limits","show feed":"feed.list","show topics":"topics.list"})
     if lower in singles:return action(singles[lower])
+    match=re.fullmatch(r"(?:open )?settings (accounts|profile|brand|usage|x|ai|voice|product|appearance|safety|data|updates)",lower)
+    if match:return action("settings.open",section="memory" if match[1]=="profile" else match[1])
+    match=re.fullmatch(r"(?:connect|login) (grok|claude|kimi|deepseek)",lower)
+    if match:return Plan(message="Connect "+match[1]+" in Settings > AI Provider using its official developer API key. Consumer chat login is not an API authorization. No credentials should be pasted here.",actions=[Action(tool="settings.open",arguments={"section":"ai"})])
+    match=re.fullmatch(r"save draft (.+)",s,re.I|re.S)
+    if match:return action("content.saveDraft",text=match[1])
+    match=re.fullmatch(r"export (settings|drafts|history|database)",lower)
+    if match:return action("data.export",kind=match[1])
+    match=re.fullmatch(r"(?:set|change) setting ([a-z_]+)(?: to| =) (.+)",s,re.I|re.S)
+    if match:
+        try:value=json.loads(match[2])
+        except ValueError:value=match[2]
+        return action("settings.update",**{match[1].lower():value})
+
+    match=re.fullmatch(r"(?:set|change) (?:my )?profile (name|role|bio|industry|expertise|products|audience|goals)(?: to| =) ?(.*)",s,re.I)
+    if match:return action("profile.update",**{match[1].lower():match[2]})
+    match=re.fullmatch(r"(?:set|change) (?:my )?(daily[ _](?:ai[ _]limit|reply[ _]limit|post[ _]limit|write[ _]cap|search[ _]limit)|hourly[ _]write[ _]limit|same[ _]account[ _]limit|poll[ _]minutes)(?: to| =)? (\d+)",lower)
+    if match:return action("settings.update",**{match[1].replace(" ","_"):int(match[2])})
+    match=re.fullmatch(r"(?:use|switch to) (chatgpt|gemini|openai|grok|claude|kimi|deepseek|ollama)(?: for ai)?",lower)
+    if match:return action("settings.update",ai_provider=match[1])
+    match=re.fullmatch(r"(?:delete|remove) draft (\d+)",lower)
+    if match:return action("content.deleteDraft",draft_id=int(match[1]))
+    match=re.fullmatch(r"check (?:draft )?(\d+)",lower)
+    if match:return action("content.check",draft_id=int(match[1]))
+    match=re.fullmatch(r"edit draft (\d+)(?: to| :) (.+)",s,re.I|re.S)
+    if match:return action("content.edit",draft_id=int(match[1]),text=match[2])
+    match=re.fullmatch(r"delete (idea|topic|media) (\S+)",lower)
+    if match:return action({"idea":"ideas.delete","topic":"topics.delete","media":"media.delete"}[match[1]],id=match[2] if match[1]=="media" else int(match[2]))
+
     if lower in {"help","help me set this up"}:return Plan(message=HELP)
     if lower=="clear":return Plan(message="Display cleared. History remains available locally.")
     if lower.startswith("/search "):return Plan(message="history_search:"+s[8:])
@@ -146,6 +177,9 @@ schedule <draft-id> tomorrow 8am | cancel schedule <id>
 show automations | pause automation <id> | resume automation <id> | delete automation <id>
 CONTROL: weekly plan | show history | show analytics | show media | open <screen> | manual <draft-id> | skip <draft-id>
 Type yes/no only after an exact action preview. One confirmation applies to one shown action.
+SETTINGS: show profile | set profile bio to <text> | show settings | show limits | set daily ai limit to 100
+EDIT: edit draft <id> to <text> | check draft <id> | delete draft <id> | show topics | delete topic <id>
+PROVIDERS: use grok | use claude | use kimi | use deepseek (then configure the secure API key in Settings)
 SYSTEM: settings | show memory | clear memory | /search <history text> | clear | help
 Natural language works with your selected AI provider. Example: every morning at 7 scan X for AI engineering and prepare five replies.
 Public actions and recurring workflows require confirmation. X API charges are separate from AI usage.
@@ -187,12 +221,16 @@ def validate(plan):
         if a.tool not in REGISTRY:raise ValueError("The AI requested an unavailable application tool. No action was taken.")
         spec=REGISTRY[a.tool]
         try:args=spec.schema.model_validate(a.arguments)
-        except ValidationError:raise ValueError("Invalid arguments for "+a.tool+". No action was taken.") from None
+        except ValidationError as error:
+            from .validation import log_validation,safe_errors
+            log_validation(a.tool,error,spec.schema.model_fields)
+            fields=", ".join(sorted({str(e["loc"][-1]) for e in safe_errors(error,spec.schema.model_fields)}))
+            raise ValueError("Invalid arguments for "+a.tool+". Check "+fields+". No action was taken.") from None
         parsed.append((spec,args))
     return parsed
 
 def snapshot(spec,args):
-    result={"tool":spec.name,"arguments":args.model_dump(),"description":spec.description}
+    result={"tool":spec.name,"arguments":args.model_dump(exclude_unset=True),"description":spec.description}
     if hasattr(args,"draft_id"):
         draft=ws.get_draft(args.draft_id)
         from .social.registry import provider as social_provider
@@ -201,6 +239,15 @@ def snapshot(spec,args):
     if hasattr(args,"id") and spec.name.startswith("automations."):
         result["automation"]=db.one("SELECT * FROM automations WHERE id=?",(args.id,))
         if not result["automation"]:raise ValueError("Automation not found.")
+    if spec.name=="settings.update":
+        result["previous_settings"]={k:__import__("app.preferences",fromlist=["get"]).get(k) for k,v in args.model_dump(exclude_none=True).items()}
+    if spec.name.startswith("profile."):
+        from .profile import get_profile
+        result["previous_profile"]=get_profile()
+    tables={"media.delete":"media","media.update":"media","ideas.delete":"ideas","topics.update":"tracked_topics","topics.delete":"tracked_topics","watchlist.update":"social_watch","media.assist":"media","scheduler.delete":"scheduled_posts"}
+    if spec.name in tables:
+        result["previous_record"]=db.one("SELECT * FROM "+tables[spec.name]+" WHERE id=?",(args.id,))
+        if not result["previous_record"]:raise ValueError("The requested item no longer exists.")
     return redact(result)
 
 def request_approval(command_id,spec,args):
@@ -211,7 +258,7 @@ def request_approval(command_id,spec,args):
     if old:return old
     key=str(uuid.uuid4())
     db.execute("INSERT INTO action_requests(id,command_id,tool,arguments,snapshot,checksum,risk,created_at) VALUES(?,?,?,?,?,?,?,?)",
-        (key,command_id,spec.name,json.dumps(args.model_dump()),raw,checksum,spec.permission.value,db.now()))
+        (key,command_id,spec.name,json.dumps(args.model_dump(exclude_unset=True)),raw,checksum,spec.permission.value,db.now()))
     event(command_id,"approval_created",spec.name)
     return db.one("SELECT * FROM action_requests WHERE id=?",(key,))
 
@@ -256,6 +303,11 @@ async def confirm(request_id,checksum):
         if hasattr(args,"draft_id") and ws.content_hash(ws.get_draft(args.draft_id))!=original["content_hash"]:
             db.execute("UPDATE action_requests SET status='stale' WHERE id=?",(request_id,))
             raise ValueError("The draft changed. Request approval again for the new content.")
+        refreshed=snapshot(spec,args)
+        for key in ("previous_settings","previous_profile","previous_record"):
+            if key in original and original[key]!=refreshed.get(key):
+                db.execute("UPDATE action_requests SET status='stale' WHERE id=?",(request_id,))
+                raise ValueError("The item changed since this preview. Request approval again.")
         with db.conn() as c:
             if not c.execute("UPDATE action_requests SET status='executing' WHERE id=? AND status='pending'",(request_id,)).rowcount:
                 raise ValueError("This request is already being handled.")

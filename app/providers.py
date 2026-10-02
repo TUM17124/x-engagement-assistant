@@ -59,15 +59,16 @@ class AIProvider(ABC):
 
 class OpenAICompatibleProvider(AIProvider):
     service = "OpenAI-compatible API"
+    def payload(self, system, user):
+        return {"model":self.model,"messages":[{"role":"system","content":system},{"role":"user","content":user}],"temperature":0.8,"max_tokens":1024}
+
     async def complete(self, system, user):
         if not self.base_url or not self.model:
             raise ValueError("Choose an AI endpoint and model in Settings.")
         headers = {"Authorization": "Bearer " + self.key} if self.key else {}
         async with httpx.AsyncClient(timeout=60) as client:
             r = await request(client, "POST", self.base_url + "/chat/completions", self.service,
-                headers=headers, json={"model": self.model, "messages":[
-                    {"role":"system","content":system},{"role":"user","content":user}],
-                    "temperature":0.8,"max_tokens":1024})
+                headers=headers, json=self.payload(system,user))
         try:
             text = r.json()["choices"][0]["message"]["content"].strip()
         except (KeyError, TypeError, IndexError, AttributeError, ValueError):
@@ -147,6 +148,64 @@ def provider():
     if not model:
         raise ValueError("Select an AI model in Settings.")
     classes = {"gemini":GeminiProvider,"openai":OpenAIProvider,
-               "compatible":OpenAICompatibleProvider,"ollama":OllamaProvider}
+               "compatible":OpenAICompatibleProvider,"ollama":OllamaProvider,
+               "grok":GrokProvider,"claude":ClaudeProvider,"kimi":KimiProvider,"deepseek":DeepSeekProvider}
     base = prefs.get("ai_base_url") or ("http://127.0.0.1:11434" if kind == "ollama" else "")
     return classes[kind](model, store.get("ai_api_key_" + kind), base)
+
+
+class KimiProvider(OpenAICompatibleProvider):
+    service="Kimi"
+    def __init__(self,model,key="",base_url=""):
+        super().__init__(model,key,"https://api.moonshot.ai/v1")
+    def payload(self,system,user):
+        if not self.key:raise ValueError("Add a Kimi API key in Settings > AI Provider.")
+        return {"model":self.model,"messages":[{"role":"system","content":system},{"role":"user","content":user}]}
+
+class DeepSeekProvider(KimiProvider):
+    service="DeepSeek"
+    def __init__(self,model,key="",base_url=""):
+        AIProvider.__init__(self,model,key,"https://api.deepseek.com/v1")
+    def payload(self,system,user):
+        if not self.key:raise ValueError("Add a DeepSeek API key in Settings > AI Provider.")
+        return {"model":self.model,"messages":[{"role":"system","content":system},{"role":"user","content":user}]}
+
+class GrokProvider(OpenAICompatibleProvider):
+    service="Grok (xAI)"
+    def __init__(self,model,key="",base_url=""):
+        super().__init__(model,key,"https://api.x.ai/v1")
+    async def complete(self,system,user):
+        if not self.key:raise ValueError("Add an xAI API key in Settings > AI Provider.")
+        async with httpx.AsyncClient(timeout=120) as client:
+            r=await request(client,"POST",self.base_url+"/responses",self.service,
+                headers={"Authorization":"Bearer "+self.key},
+                json={"model":self.model,"input":[{"role":"system","content":system},{"role":"user","content":user}]})
+        try:
+            text="".join(c.get("text","") for item in r.json().get("output",[]) if item.get("type")=="message"
+                         for c in item.get("content",[]) if c.get("type")=="output_text").strip()
+        except (TypeError,AttributeError,ValueError):text=""
+        if not text:raise ValueError("Grok returned no usable text. Check the model and try again.")
+        return text
+
+class ClaudeProvider(AIProvider):
+    service="Claude"
+    def __init__(self,model,key="",base_url=""):
+        super().__init__(model,key,"https://api.anthropic.com/v1")
+    def headers(self):
+        if not self.key:raise ValueError("Add a Claude API key in Settings > AI Provider.")
+        headers={"Authorization":"Bearer "+self.key,"anthropic-version":"2023-06-01"}
+        workspace=prefs.get("claude_workspace_id")
+        if workspace:headers["anthropic-workspace-id"]=workspace
+        return headers
+    async def complete(self,system,user):
+        async with httpx.AsyncClient(timeout=120) as client:
+            r=await request(client,"POST",self.base_url+"/messages",self.service,headers=self.headers(),
+                json={"model":self.model,"max_tokens":4096,"system":system,"messages":[{"role":"user","content":user}]})
+        try:text="".join(c.get("text","") for c in r.json().get("content",[]) if c.get("type")=="text").strip()
+        except (TypeError,AttributeError,ValueError):text=""
+        if not text:raise ValueError("Claude returned no usable text. Check the model and try again.")
+        return text
+    async def health_check(self):
+        async with httpx.AsyncClient(timeout=20) as client:
+            await request(client,"GET",self.base_url+"/models/"+quote(self.model,safe=""),self.service,headers=self.headers())
+        return True

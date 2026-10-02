@@ -8,7 +8,7 @@ PATTERNS=[
     (re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),"private key"),
     (re.compile(rb"AIza[0-9A-Za-z_-]{30,}"),"Google API key"),
     (re.compile(rb"(?:ghp_|github_pat_)[A-Za-z0-9_]{30,}"),"GitHub token"),
-    (re.compile(rb"sk-(?:proj-)?[A-Za-z0-9_-]{30,}"),"AI API key"),
+    (re.compile(rb"(?:sk-(?:proj-)?|xai-)[A-Za-z0-9_-]{30,}"),"AI API key"),
 ]
 def check(name,content):
     if Path(name).name in {"chatgpt-host.json","chatgpt-auth.json"}:

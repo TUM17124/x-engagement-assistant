@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 def data_dir():
     override = os.getenv("XEA_DATA_DIR")
     if override:

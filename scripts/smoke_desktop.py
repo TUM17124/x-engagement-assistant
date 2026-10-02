@@ -7,6 +7,7 @@ import subprocess
 import sys
 import time
 import httpx
+ctypes.windll.user32.SetProcessDPIAware()
 from PIL import ImageGrab
 
 root=Path(__file__).resolve().parent.parent
@@ -17,6 +18,7 @@ os.environ["XEA_TESTING"]="1"
 sys.path.insert(0,str(root))
 from app import database as db
 db.init_db()
+db.set_setting("check_updates",False)
 db.set_setting("onboarded",True)
 db.set_setting("tray_enabled",False)
 db.set_setting("monitoring",False)
@@ -58,9 +60,14 @@ try:
         user.EnumWindows(collect,0)
         if not windows:raise RuntimeError("The native app has no visible window.")
         window=windows[0]
+        user.SetForegroundWindow(window)
+        user.MoveWindow(window,0,0,min(1200,user.GetSystemMetrics(0)),min(800,user.GetSystemMetrics(1)-45),True)
+        time.sleep(6)
+        bounds=wintypes.RECT()
+        user.GetWindowRect(window,ctypes.byref(bounds))
         screenshot=root/"artifacts"/"desktop-home.png"
         screenshot.parent.mkdir(exist_ok=True)
-        ImageGrab.grab(window=window).save(screenshot)
+        ImageGrab.grab(bbox=(bounds.left,bounds.top,bounds.right,bounds.bottom)).save(screenshot)
         print("Native window, bundled backend, dashboard, terminal and zero writes verified.")
         print("Screenshot:",screenshot)
         user.PostMessageW(window,0x0010,0,0)

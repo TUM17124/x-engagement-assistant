@@ -177,3 +177,9 @@ from .chatgpt_routes import router as chatgpt_router
 from .terminal_routes import router as terminal_router
 app.include_router(chatgpt_router)
 app.include_router(terminal_router)
+
+from .updates import router as updates_router
+app.include_router(updates_router)
+
+from .profile import router as profile_router
+app.include_router(profile_router)
