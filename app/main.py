@@ -29,6 +29,10 @@ async def lifespan(app):
     except ImportError:
         pass
     yield
+    from .chatgpt_auth import auth
+    from .terminal_routes import cancel_all
+    await cancel_all()
+    await auth.close_listener()
     if task:
         task.cancel()
         try:
@@ -155,3 +159,8 @@ app.include_router(media_router)
 
 from .social.privacy import router as privacy_router
 app.include_router(privacy_router)
+
+from .chatgpt_routes import router as chatgpt_router
+from .terminal_routes import router as terminal_router
+app.include_router(chatgpt_router)
+app.include_router(terminal_router)

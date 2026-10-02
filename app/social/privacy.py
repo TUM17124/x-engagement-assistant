@@ -8,7 +8,11 @@ router=APIRouter(prefix="/api/social")
 @router.delete("/data")
 async def clear_data(data:dict):
     if data.get("confirm")!="DELETE":raise ValueError("Confirm local deletion by typing DELETE.")
-    async with ws.WRITE_LOCK:
+    from ..terminal_routes import cancel_all
+    from ..automations import LOCK
+    await cancel_all()
+    db.set_setting("automations_paused",True)
+    async with LOCK, ws.WRITE_LOCK:
         for platform in CATALOG:
             provider(platform).disconnect()
         for row in db.rows("SELECT id FROM media"):
@@ -16,7 +20,7 @@ async def clear_data(data:dict):
             except ValueError:pass
         with db.conn() as c:
             c.execute("PRAGMA secure_delete=ON")
-            for table in ("approved_content","scheduled_posts","media_usage","drafts","feed_items","activity","actions",
+            for table in ("terminal_commands","action_requests","automations","automation_runs","automation_steps","command_events","application_memory","approved_content","scheduled_posts","media_usage","drafts","feed_items","activity","actions",
                           "social_watch","social_mutes","social_usage","social_accounts","media","ideas","watched_accounts",
                           "tracked_topics","muted_accounts","muted_topics","notifications","ai_usage","search_usage","settings","app_meta"):
                 c.execute("DELETE FROM "+table)

@@ -53,3 +53,8 @@ src-tauri/gen/
 artifacts/
 
 .tools/
+
+# ChatGPT installation and credential records
+chatgpt-host.json
+chatgpt-auth.json
+chatgpt-*.credentials.json

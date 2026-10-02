@@ -55,6 +55,18 @@ def quality(text,source=""):
     product=prefs.get("product").get("name","")
     if product and product.casefold() in low and product.casefold() not in source.casefold():flags.append("Review whether the product mention is useful")
     if re.search(r"\b(\d+%|\$\d+|our customers|my experience)\b",low):flags.append("Verify personal, customer, or numeric claims")
+    banned_custom=(prefs.get("brand_voice").get("Banned phrases","")+"\n"+prefs.get("voice").get("hate","")).splitlines()
+    if any(phrase.strip().casefold() in low for line in banned_custom for phrase in line.split(",") if phrase.strip()):
+        flags.append("Contains a phrase you asked to avoid")
+    closing=re.split(r"[.!?]",low.rstrip(".!?"))[-1].strip()
+    if len(closing)>15 and any(t.casefold().rstrip(".!?").endswith(closing) for t in recent):
+        flags.append("Repeated closing or call to action")
+    emojis="".join(c for c in text if ord(c)>=0x1f300)
+    if emojis and any("".join(c for c in t if ord(c)>=0x1f300)==emojis for t in recent):
+        flags.append("Repeated emoji pattern")
+    if product and product.casefold() in low and sum(product.casefold() in t.casefold() for t in recent[:10])>=3:
+        flags.append("Frequent product mentions in recent posts")
+    if text.count("!")>2:flags.append("Many exclamation marks; consider a calmer tone")
     return flags
 
 def local_score(item):
@@ -164,7 +176,7 @@ def trends():
 
 def brief():
     drafts=db.one("SELECT COUNT(*) n FROM drafts WHERE status='draft'")["n"]
-    return {"needs_review":drafts,"high_priority":db.rows("SELECT * FROM feed_items WHERE ignored=0 AND priority>=60 ORDER BY priority DESC LIMIT 5"),
+    return {"needs_review":drafts,"high_priority_count":db.one("SELECT COUNT(*) n FROM drafts WHERE status=\'draft\' AND score>=60")["n"],"high_priority":db.rows("SELECT * FROM feed_items WHERE ignored=0 AND priority>=60 ORDER BY priority DESC LIMIT 5"),
         "mentions":db.one("SELECT COUNT(*) n FROM feed_items WHERE ignored=0 AND content_kind='mention'")["n"],
         "comments":db.one("SELECT COUNT(*) n FROM feed_items WHERE ignored=0 AND content_kind='comment'")["n"],
         "scheduled":db.rows("SELECT s.*,d.text,d.platform FROM scheduled_posts s JOIN drafts d ON d.id=s.draft_id WHERE s.status='pending' ORDER BY due_at LIMIT 5"),

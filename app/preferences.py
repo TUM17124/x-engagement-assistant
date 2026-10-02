@@ -9,7 +9,7 @@ DEFAULTS = {
     "my_profile": {}, "brand_voice": {}, "image_provider": {},
     "notify_priority": True, "notify_mentions": True, "notify_connections": True,
     "x_client_id": "", "x_redirect_uri": "http://127.0.0.1:8787/auth/callback",
-    "ai_provider": "gemini", "ai_model": "gemini-2.5-flash", "ai_base_url": "",
+    "ai_provider": "chatgpt", "chatgpt_model": "", "ai_model": "", "ai_base_url": "",
     "discovery_mode": "automatic", "daily_search_limit": 20,
     "onboarded": False, "interests": [], "theme": "dark", "notifications": False,
     "tray_enabled": False, "monitoring": False, "read_access": False, "poll_minutes": 30,
@@ -49,7 +49,7 @@ def save(values, persist=True):
                 raise ValueError("Profile fields must be text, up to 4000 characters.")
         if key == "interests" and (not isinstance(value, list) or len(value) > 50 or any(not isinstance(x,str) or len(x)>100 for x in value)):
             raise ValueError("Enter up to 50 short interests.")
-        if key == "ai_provider" and value not in {"gemini","openai","compatible","ollama"}:
+        if key == "ai_provider" and value not in {"chatgpt","gemini","openai","compatible","ollama"}:
             raise ValueError("Choose a supported AI provider.")
         if key == "discovery_mode" and value not in {"automatic","api","web"}:
             raise ValueError("Choose Automatic, X API Search, or X Web Search.")
@@ -86,6 +86,9 @@ def bootstrap_dev_env():
             db.set_setting(key, values[key.upper()])
     if values.get("AI_BASE_URL") and db.get_setting("ai_provider") is None:
         db.set_setting("ai_provider", "compatible")
+    if values.get("OPENAI_API_KEY") and not values.get("AI_BASE_URL") and db.get_setting("ai_provider") is None:
+        db.set_setting("ai_provider","openai")
+        store.set("ai_api_key_openai",values["OPENAI_API_KEY"])
     for key in PUBLIC_SECRET_NAMES:
         target = "ai_api_key_" + get("ai_provider") if key == "ai_api_key" else key
         if values.get(key.upper()) and not store.get(target):

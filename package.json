@@ -1,12 +1,12 @@
 {
   "name": "x-engagement-assistant",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "Approval-first local X engagement desktop workspace",
+  "description": "Local approval-first social engagement workspace with ChatGPT and an AI command terminal",
   "scripts": {
     "desktop:dev": "tauri dev --no-dev-server",
     "desktop:build": "tauri build",
-    "check:ui": "node scripts/check_ui.cjs"
+    "check:ui": "node scripts/check_ui.cjs && node scripts/check_social_ui.cjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.10.0"

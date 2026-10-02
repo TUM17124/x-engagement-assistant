@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from .paths import data_dir
 
 DB_PATH = data_dir() / "workspace.sqlite3"
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 MIGRATIONS = [
 """
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -88,6 +88,31 @@ CREATE INDEX social_usage_date ON social_usage(platform,created_at);
 """)
 
 MIGRATIONS.append("ALTER TABLE actions ADD COLUMN platform TEXT NOT NULL DEFAULT 'x'; DELETE FROM approved_content; UPDATE drafts SET status='draft' WHERE status IN ('approved','scheduled'); UPDATE scheduled_posts SET status='cancelled',error='Reapprove after the multi-social upgrade.' WHERE status='pending';")
+
+MIGRATIONS.append("""
+CREATE TABLE terminal_commands(id TEXT PRIMARY KEY,source TEXT NOT NULL,raw_input TEXT NOT NULL,
+ parsed_intent TEXT NOT NULL DEFAULT '',arguments TEXT NOT NULL DEFAULT '{}',risk_level TEXT NOT NULL DEFAULT 'READ_ONLY',
+ requires_approval INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL,created_at TEXT NOT NULL,
+ finished_at TEXT,result TEXT NOT NULL DEFAULT '{}');
+CREATE TABLE action_requests(id TEXT PRIMARY KEY,command_id TEXT,tool TEXT NOT NULL,arguments TEXT NOT NULL,
+ snapshot TEXT NOT NULL,checksum TEXT NOT NULL,risk TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending',
+ created_at TEXT NOT NULL,finished_at TEXT,error TEXT NOT NULL DEFAULT '');
+CREATE TABLE automations(id INTEGER PRIMARY KEY,name TEXT NOT NULL,trigger TEXT NOT NULL,config TEXT NOT NULL,
+ timezone TEXT NOT NULL,status TEXT NOT NULL,next_run TEXT NOT NULL,created_at TEXT NOT NULL,error TEXT NOT NULL DEFAULT '');
+CREATE TABLE automation_runs(id INTEGER PRIMARY KEY,automation_id INTEGER NOT NULL,started_at TEXT NOT NULL,
+ finished_at TEXT,status TEXT NOT NULL,summary TEXT NOT NULL DEFAULT '',UNIQUE(automation_id,started_at));
+CREATE TABLE automation_steps(run_id INTEGER NOT NULL,step_key TEXT NOT NULL,status TEXT NOT NULL,
+ result TEXT NOT NULL DEFAULT '{}',PRIMARY KEY(run_id,step_key));
+CREATE TABLE command_events(id INTEGER PRIMARY KEY,command_id TEXT,automation_id INTEGER,event TEXT NOT NULL,
+ tool TEXT NOT NULL DEFAULT '',status TEXT NOT NULL,created_at TEXT NOT NULL);
+CREATE TABLE application_memory(key TEXT PRIMARY KEY,value TEXT NOT NULL,updated_at TEXT NOT NULL);
+CREATE INDEX automation_next ON automations(status,next_run);
+CREATE INDEX action_requests_status ON action_requests(status,created_at);
+CREATE INDEX terminal_time ON terminal_commands(created_at);
+-- Preserve configured providers; older default-Gemini installations without saved settings keep their provider.
+INSERT OR IGNORE INTO settings(key,value)
+ SELECT 'ai_provider','"gemini"' WHERE EXISTS(SELECT 1 FROM settings);
+""")
 
 def now():
     return datetime.now(timezone.utc).isoformat()

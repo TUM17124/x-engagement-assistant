@@ -29,7 +29,7 @@ fn main() {
             let nav_handle=handle.clone();
             WebviewWindowBuilder::new(app,"main",WebviewUrl::App("index.html".into()))
                 .initialization_script("window.__XEA_DESKTOP__ = true;")
-                .title("X Engagement Assistant").inner_size(1280.0,860.0).min_inner_size(760.0,600.0)
+                .title("Social Engagement Command Center").inner_size(1280.0,860.0).min_inner_size(760.0,600.0)
                 .on_navigation(move |url| {
                     let local=url.host_str()==Some("127.0.0.1") && url.port()==Some(8787);
                     let internal=url.scheme()=="tauri" || url.host_str()==Some("tauri.localhost");
@@ -40,13 +40,19 @@ fn main() {
                 .on_download(|webview,event| {
                     match event {
                         tauri::webview::DownloadEvent::Requested{url,destination} => {
-                            if url.host_str()!=Some("127.0.0.1") || url.port()!=Some(8787) || !url.path().starts_with("/api/export/") {return false;}
-                            let kind=url.path().rsplit('/').next().unwrap_or("export");
-                            if !["settings","drafts","history","database"].contains(&kind) {return false;}
+                            if url.host_str()!=Some("127.0.0.1") || url.port()!=Some(8787) { return false; }
+                            let export = url.path().strip_prefix("/api/export/");
+                            let media = url.path().starts_with("/api/media/") && url.path().ends_with("/file");
+                            let filename = if let Some(kind) = export {
+                                if !["settings","drafts","history","database"].contains(&kind) { return false; }
+                                format!("social-{}.{}", kind, if kind=="database" {"sqlite3"} else {"json"})
+                            } else if media {
+                                destination.file_name().and_then(|n|n.to_str()).unwrap_or("media").chars()
+                                    .filter(|c| !c.is_control() && !r#"<>:"/\\|?*"#.contains(*c)).take(150).collect::<String>()
+                            } else { return false; };
                             if let Ok(folder)=webview.app_handle().path().download_dir() {
-                                let ext=if kind=="database" {"sqlite3"} else {"json"};
-                                *destination=folder.join(format!("xea-{}-{}.{}",kind,uuid::Uuid::new_v4(),ext));
-                            } else {return false;}
+                                *destination=folder.join(format!("{}-{}",uuid::Uuid::new_v4(),filename));
+                            } else { return false; }
                         },
                         tauri::webview::DownloadEvent::Finished{success,..} => {
                             let message=if success {"Export saved to your Downloads folder."} else {"Export download failed. Please try again."};
@@ -72,7 +78,7 @@ fn main() {
             let quit=MenuItem::with_id(app,"quit","Quit (stops scheduling)",true,None::<&str>)?;
             let menu=Menu::with_items(app,&[&open,&pause,&resume,&quit])?;
             let tray=TrayIconBuilder::with_id("workspace").icon(app.default_window_icon().unwrap().clone())
-                .tooltip("X Engagement Assistant - monitoring paused").menu(&menu)
+                .tooltip("Social Engagement Command Center - monitoring paused").menu(&menu)
                 .on_menu_event(|app,event| {
                     match event.id.as_ref() {
                         "open" => {if let Some(w)=app.get_webview_window("main"){let _=w.show();let _=w.set_focus();}},
@@ -104,7 +110,7 @@ fn main() {
                             tray_enabled.store(enabled,Ordering::SeqCst);
                             if let Some(t)=handle.tray_by_id("workspace") {
                                 let _=t.set_visible(enabled);
-                                let label=if state["monitoring"].as_bool().unwrap_or(false) {"X Engagement Assistant - monitoring enabled"} else {"X Engagement Assistant - monitoring paused"};
+                                let label=if state["monitoring"].as_bool().unwrap_or(false) {"Social Engagement Command Center - monitoring enabled"} else {"Social Engagement Command Center - monitoring paused"};
                                 let _=t.set_tooltip(Some(label));
                             }
                         }
@@ -112,7 +118,7 @@ fn main() {
                     if let Ok(r)=http.get("http://127.0.0.1:8787/desktop/events").header("X-Desktop-Token",&token).send() {
                         if let Ok(events)=r.json::<Vec<serde_json::Value>>() {
                             for event in events {
-                                if let Some(title)=event["title"].as_str() {let _=handle.notification().builder().title("X Engagement Assistant").body(title).show();}
+                                if let Some(title)=event["title"].as_str() {let _=handle.notification().builder().title("Social Engagement Command Center").body(title).show();}
                             }
                         }
                     }
@@ -127,7 +133,7 @@ fn main() {
                 if state.tray_enabled.load(Ordering::SeqCst) {api.prevent_close();let _=window.hide();}
             }
         })
-        .build(tauri::generate_context!()).expect("Could not start X Engagement Assistant");
+        .build(tauri::generate_context!()).expect("Could not start Social Engagement Command Center");
     app.run(|handle,event| {
         if let RunEvent::Exit=event {
             let state=handle.state::<Backend>();

@@ -32,6 +32,7 @@ def events(request:Request):
 def monitoring(request:Request,enabled:bool):
     authorize(request)
     prefs.save({"monitoring":enabled,"assistant_mode":enabled})
+    db.set_setting("automations_paused",not enabled)
     return {"ok":True}
 
 @router.post("/shutdown")

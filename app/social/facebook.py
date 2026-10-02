@@ -14,8 +14,8 @@ class FacebookProvider(SocialProvider):
         # Only the selected, authorized Page; arbitrary competitor scraping is not supported.
         page=self.account.get("account_id")
         if account_id and account_id!=page:self.unsupported("unapproved Page monitoring")
-        data,_=await self.call("GET",self.root+str(page)+"/feed",params={"fields":"id,message,created_time,permalink_url,from","limit":20})
-        return [self.item(p["id"],p.get("message",""),p.get("from",{}).get("name",self.account.get("name","")),p.get("permalink_url",""),posted_at=p.get("created_time")) for p in data.get("data",[])]
+        data,_=await self.call("GET",self.root+str(page)+"/feed",params={"fields":"id,message,created_time,permalink_url,from,full_picture","limit":20})
+        return [self.item(p["id"],p.get("message",""),p.get("from",{}).get("name",self.account.get("name","")),p.get("permalink_url",""),posted_at=p.get("created_time"),media=[{"url":p["full_picture"]}] if p.get("full_picture") else []) for p in data.get("data",[])]
     async def get_comments(self,post_id):
         data,_=await self.call("GET",self.root+post_id+"/comments",params={"fields":"id,message,from,created_time,permalink_url","limit":20})
         return [self.item(p["id"],p.get("message",""),p.get("from",{}).get("name",""),p.get("permalink_url",""),content_kind="comment",posted_at=p.get("created_time")) for p in data.get("data",[])]

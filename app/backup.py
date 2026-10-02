@@ -6,7 +6,7 @@ from pathlib import Path
 from . import database as db, preferences as prefs
 
 TABLES=["watched_accounts","tracked_topics","feed_items","drafts","activity","actions","muted_accounts","muted_topics","scheduled_posts"]
-EXTRA_TABLES=["social_watch","social_mutes","ideas","media","media_usage"]
+EXTRA_TABLES=["social_watch","social_mutes","ideas","media","media_usage","terminal_commands","action_requests","automations","automation_runs","automation_steps","command_events","application_memory"]
 
 def backup_bytes():
     with tempfile.TemporaryDirectory() as folder:
@@ -56,6 +56,11 @@ def restore_bytes(data):
                     valid_columns=[r[1] for r in target.execute("PRAGMA table_info("+table+")")]
                     for row in copied.get(table,[]):
                         columns=[k for k in valid_columns if k in row]
+                        if table=="automations":
+                            row["status"]="paused";row["error"]="Restored automation needs explicit review and resume."
+                        if table=="action_requests":
+                            row["status"]="rejected";row["error"]="Restored action requires a fresh request."
+                        if table=="terminal_commands" and row["status"]=="running":row["status"]="interrupted"
                         if table=="drafts":
                             row["status"]="draft"
                         if table=="scheduled_posts":

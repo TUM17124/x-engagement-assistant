@@ -23,11 +23,21 @@ with tempfile.TemporaryDirectory() as folder:
                 time.sleep(1)
             else:raise RuntimeError("Packaged backend did not start.")
             root=client.get("/")
-            assert root.status_code==200 and "X Engagement Assistant" in root.text
+            assert root.status_code==200 and "Multi-Social AI Engagement Command Center" in root.text
             boot=client.get("/api/bootstrap").json()
             assert not boot["settings"]["onboarded"]
+            assert boot["settings"]["ai_provider"]=="chatgpt"
             client.headers["X-CSRF-Token"]=boot["csrf"]
             assert client.get("/static/forms.js").status_code==200
+            assert client.get("/static/terminal.js").status_code==200
+            assert client.get("/api/chatgpt/status").json()["connected"] is False
+            command=client.post("/api/terminal/run",json={"text":"status","timezone":"UTC"})
+            assert command.status_code==200 and '"type": "done"' in command.text
+            assert client.get("/api/terminal/automations").json()["items"]==[]
+            assert client.get("/static/social.js").status_code==200
+            assert len(client.get("/api/social/accounts").json())==7
+            assert client.get("/api/social/trends").json()==[]
+            assert client.get("/api/media").json()==[]
             parsed=client.get("/parse-tweet-url",params={"tweet_url":"https://x.com/demo/status/123456789"}).json()
             assert parsed["tweet_id"]=="123456789"
             assert client.get("/parse-tweet-url",params={"tweet_url":"bad"}).status_code==400
@@ -36,7 +46,7 @@ with tempfile.TemporaryDirectory() as folder:
             assert "isolated-smoke-key" not in client.get("/api/settings").text
             assert client.post("/api/onboarding/finish").status_code==200
             assert client.get("/api/dashboard").json()["today_writes"]==0
-            print("Packaged runtime smoke passed: launch, dashboard, UI assets, onboarding, settings, secure secret roundtrip, URL parsing, zero writes.")
+            print("Packaged runtime smoke passed: launch, dashboard, AI terminal/status, ChatGPT default, automation storage, UI assets, onboarding, settings, secure secret roundtrip, URL parsing, zero writes.")
             client.post("/desktop/shutdown",headers={"X-Desktop-Token":"isolated-smoke-control"})
             child.wait(timeout=15)
     finally:

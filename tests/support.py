@@ -32,6 +32,7 @@ class AppTest(TestCase):
         self.network=self.stack.enter_context(patch.object(httpx.AsyncClient,"send",side_effect=AssertionError("Real network is forbidden in tests")))
         self.stack.enter_context(patch("app.workers.run_workers",new_callable=AsyncMock))
         self.client=self.stack.enter_context(TestClient(main.app))
+        prefs.save({"ai_provider":"gemini","ai_model":"gemini-2.5-flash"})
         token=self.client.get("/api/bootstrap").json()["csrf"]
         self.client.headers["X-CSRF-Token"]=token
 

@@ -13,7 +13,7 @@ async def send_approved(draft,text):
     for item in media:
         if not item:raise ValueError("Attached media is missing. Edit and approve again.")
         media_path(item["id"])
-        if item["mime"]=="video/mp4" or not caps["can_upload_images"]:
+        if item["mime"] not in {"image/jpeg","image/png"} or not caps["can_upload_images"]:
             raise ValueError("This platform uses manual handoff for the selected media.")
     if draft["kind"]=="original":
         if not caps["can_publish"]:p.unsupported("API publishing")

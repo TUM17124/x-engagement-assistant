@@ -1,5 +1,5 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert'),path=require('path');
-const files=['app','settings','feed','screens','actions','accounts','social','social-actions','forms'];
+const files=['app','settings','feed','screens','actions','accounts','social','social-actions','terminal','forms'];
 for(const file of files)new vm.Script(fs.readFileSync(path.join('app/static',file+'.js'),'utf8'),{filename:file+'.js'});
 const context={console,URLSearchParams,FormData,Date,setTimeout,clearTimeout,
 document:{addEventListener(){},querySelector(){return null}},window:{addEventListener(){}},location:{hash:''}};

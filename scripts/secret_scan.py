@@ -11,6 +11,8 @@ PATTERNS=[
     (re.compile(rb"sk-(?:proj-)?[A-Za-z0-9_-]{30,}"),"AI API key"),
 ]
 def check(name,content):
+    if Path(name).name in {"chatgpt-host.json","chatgpt-auth.json"}:
+        return "private ChatGPT installation/credential file"
     if name!=".env.example" and (Path(name).name.startswith(".env") or re.search(r"\.(db|sqlite3?|pem|key|bin)(-|$)",name)):
         return "private credential/data file"
     for pattern,label in PATTERNS:

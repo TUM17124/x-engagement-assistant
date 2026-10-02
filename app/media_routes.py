@@ -24,15 +24,22 @@ def file(id:str,download:bool=False):
     return FileResponse(media.media_path(id),media_type=row["mime"],filename=row["name"] if download else None)
 
 @router.put("/{id}")
-def update(id:str,data:dict):
-    allowed={"tags","folder","favorite","caption","alt_text"}
-    if set(data)-allowed:raise ValueError("Unknown media field.")
-    if not db.one("SELECT id FROM media WHERE id=?",(id,)):raise ValueError("Media not found.")
-    for key,value in data.items():
-        if key=="favorite":value=int(bool(value))
-        elif not isinstance(value,str) or len(value)>4000:raise ValueError("Media metadata must be short text.")
-        db.execute("UPDATE media SET "+key+"=? WHERE id=?",(value,id))
-    return {"saved":True}
+async def update(id:str,data:dict):
+    async with ws.WRITE_LOCK:
+        allowed={"tags","folder","favorite","caption","alt_text"}
+        if set(data)-allowed:raise ValueError("Unknown media field.")
+        if not db.one("SELECT id FROM media WHERE id=?",(id,)):raise ValueError("Media not found.")
+        for key,value in data.items():
+            if key=="favorite":value=int(bool(value))
+            elif not isinstance(value,str) or len(value)>4000:raise ValueError("Media metadata must be short text.")
+            db.execute("UPDATE media SET "+key+"=? WHERE id=?",(value,id))
+        if "alt_text" in data:
+            for draft in db.rows("SELECT id,media_ids FROM drafts WHERE status IN ('approved','scheduled')"):
+                if id in json.loads(draft["media_ids"]):
+                    db.execute("DELETE FROM approved_content WHERE draft_id=?",(draft["id"],))
+                    db.execute("UPDATE drafts SET status='draft' WHERE id=?",(draft["id"],))
+                    db.execute("UPDATE scheduled_posts SET status='cancelled' WHERE draft_id=?",(draft["id"],))
+        return {"saved":True}
 
 @router.post("/{id}/transform")
 def transform(id:str,data:dict):

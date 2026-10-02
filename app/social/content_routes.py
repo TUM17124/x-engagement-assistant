@@ -109,8 +109,8 @@ def schedule(id:int,data:dict):
     if mode not in {"api","manual"}:raise ValueError("Choose API publishing or a manual reminder.")
     if mode=="api":
         if not provider(d["platform"]).capabilities()["can_publish"]:raise ValueError("Use a manual publishing reminder for this platform.")
-        if json.loads(d["media_ids"]) and not provider(d["platform"]).capabilities()["can_upload_images"]:raise ValueError("Attached media requires a manual reminder.")
-    result=ws.schedule(id,str(data.get("due_at","")),str(data.get("timezone","")))
+        if json.loads(d["media_ids"]) and (not provider(d["platform"]).capabilities()["can_upload_images"] or any((db.one("SELECT mime FROM media WHERE id=?",(id,)) or {}).get("mime") not in {"image/jpeg","image/png"} for id in json.loads(d["media_ids"]))):raise ValueError("Attached media requires a manual reminder.")
+    result=ws.schedule(id,str(data.get("due_at","")),str(data.get("timezone","")),manual=mode=="manual")
     db.execute("UPDATE scheduled_posts SET delivery=? WHERE draft_id=?",(mode,id))
     return result
 
@@ -137,6 +137,9 @@ def analytics():
        "topics":db.rows("SELECT topic,COUNT(*) count FROM activity WHERE status='published' AND topic<>'' GROUP BY topic ORDER BY count DESC LIMIT 10"),
        "accounts":db.rows("SELECT platform,target_account,COUNT(*) count FROM activity WHERE status='published' AND target_account<>'' GROUP BY platform,target_account ORDER BY count DESC LIMIT 10"),
        "drafts":db.rows("SELECT platform,status,COUNT(*) count FROM drafts GROUP BY platform,status"),
+       "acceptance":db.rows("""SELECT platform,COUNT(*) generated,
+           SUM(CASE WHEN EXISTS(SELECT 1 FROM activity a WHERE a.draft_id=d.id AND a.action='approved') THEN 1 ELSE 0 END) accepted
+           FROM drafts d WHERE generated_text<>'' GROUP BY platform"""),
        "note":"Counts represent locally recorded actions. Manual opens are not published posts; no impressions or follower growth are estimated."}
 
 @router.post("/suggest")

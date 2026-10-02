@@ -1,4 +1,5 @@
 async function submit(f){
+if(["terminal-form","automation-form","memory-form"].includes(f.id))return terminalSubmit(f);
 const d=values(f);
 if(isSocialForm(f))return msSubmit(f);
 if(f.classList.contains('social-account-form')||f.classList.contains('social-callback-form'))return socialAccountSubmit(f);

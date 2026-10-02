@@ -12,6 +12,7 @@ from .post_urls import parse_tweet_url
 
 WRITE_LOCK = asyncio.Lock()
 AI_LOCK = asyncio.Lock()
+REPLY_LOCK = asyncio.Lock()
 KINDS = {"reply", "comment", "original", "quote", "thread"}
 STYLES = {"", "Shorter", "More casual", "More technical", "More humorous", "Disagree politely",
           "Ask a question", "Mention my product naturally", "Do NOT mention my product", "Longer", "More professional", "Humanize"}
@@ -71,10 +72,11 @@ def save_draft(kind, text, feed_id=None, generated="", reason="", score=0, topic
         if current["status"] in {"sending","published","uncertain","partial"}:
             raise ValueError("This draft has already been sent or needs reconciliation. Create a new draft.")
         with db.conn() as c:
-            c.execute("UPDATE drafts SET kind=?,text=?,feed_id=?,status='draft',updated_at=? WHERE id=?",
-                      (kind,text,feed_id,db.now(),draft_id))
+            changed=c.execute("UPDATE drafts SET kind=?,text=?,feed_id=?,status='draft',updated_at=? WHERE id=? AND status NOT IN ('sending','published','uncertain','partial')",
+                      (kind,text,feed_id,db.now(),draft_id)).rowcount
+            if not changed:raise ValueError("The draft is already being published or needs reconciliation.")
             if generated:
-                c.execute("UPDATE drafts SET generated_text=?,provider=?,model=? WHERE id=?",(generated,prefs.get("ai_provider"),prefs.get("ai_model"),draft_id))
+                c.execute("UPDATE drafts SET generated_text=?,provider=?,model=? WHERE id=?",(generated,prefs.get("ai_provider"),(prefs.get("chatgpt_model") if prefs.get("ai_provider")=="chatgpt" else prefs.get("ai_model")),draft_id))
             c.execute("DELETE FROM approved_content WHERE draft_id=?",(draft_id,))
             c.execute("UPDATE scheduled_posts SET status='cancelled' WHERE draft_id=?",(draft_id,))
         if media_ids is not None:
@@ -83,7 +85,7 @@ def save_draft(kind, text, feed_id=None, generated="", reason="", score=0, topic
         return get_draft(draft_id)
     draft_id = db.execute("""INSERT INTO drafts(kind,text,feed_id,generated_text,reason,score,topic,provider,model,created_at,updated_at)
       VALUES(?,?,?,?,?,?,?,?,?,?,?)""",(kind,text,feed_id,generated,reason,score,topic,
-      prefs.get("ai_provider") if generated else "",prefs.get("ai_model") if generated else "",db.now(),db.now()))
+      prefs.get("ai_provider") if generated else "",(prefs.get("chatgpt_model") if prefs.get("ai_provider")=="chatgpt" else prefs.get("ai_model")) if generated else "",db.now(),db.now()))
     db.execute("UPDATE drafts SET platform=?,media_ids=? WHERE id=?",(platform,json.dumps(media_ids or []),draft_id))
     return get_draft(draft_id)
 
@@ -111,6 +113,13 @@ async def ai_call(operation):
             raise
 
 async def generate_reply(feed_id, style="", draft_id=None):
+    async with REPLY_LOCK:
+        if draft_id is None:
+            existing=db.one("SELECT id FROM drafts WHERE feed_id=? AND kind IN ('reply','comment') ORDER BY id DESC LIMIT 1",(feed_id,))
+            if existing:return get_draft(existing["id"])
+        return await _generate_reply(feed_id,style,draft_id)
+
+async def _generate_reply(feed_id, style="", draft_id=None):
     if style not in STYLES:
         raise ValueError("Unknown reply style.")
     feed = db.one("SELECT * FROM feed_items WHERE id=?",(feed_id,))
@@ -146,7 +155,7 @@ async def generate_reply(feed_id, style="", draft_id=None):
             raise ValueError("Draft does not match this source.")
         updated = save_draft("reply",text,feed_id,draft_id=draft_id)
         db.execute("UPDATE drafts SET generated_text=?,provider=?,model=?,reason=?,score=?,topic=? WHERE id=?",
-                   (text,prefs.get("ai_provider"),prefs.get("ai_model"),reason,score,topic,draft_id))
+                   (text,prefs.get("ai_provider"),(prefs.get("chatgpt_model") if prefs.get("ai_provider")=="chatgpt" else prefs.get("ai_model")),reason,score,topic,draft_id))
         return get_draft(draft_id)
     draft = save_draft("reply",text,feed_id,text,reason,score,topic)
     notify("A new reply draft is ready for review.")
@@ -259,10 +268,10 @@ async def publish(draft_id, scheduled=False):
             db.execute("INSERT INTO media_usage(media_id,draft_id,used_at) VALUES(?,?,?)",(media_id,draft_id,db.now()))
         return {"published":True,"post_ids":ids}
 
-def schedule(draft_id, due_at, timezone_name):
+def schedule(draft_id, due_at, timezone_name, manual=False):
     from zoneinfo import ZoneInfo
     draft = require_approved(draft_id)
-    if draft["kind"] != "original":
+    if draft["kind"] != "original" and not manual:
         raise ValueError("Scheduling is available for approved original posts only. Replies remain manual approval actions.")
     due = datetime.fromisoformat(due_at.replace("Z","+00:00"))
     if due.tzinfo is None or due <= datetime.now(timezone.utc):

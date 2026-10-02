@@ -21,5 +21,5 @@ class LocalSecurityMiddleware(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Content-Security-Policy"] = ("default-src 'self'; script-src 'self'; style-src 'self'; "
-            "img-src 'self' https://pbs.twimg.com data:; media-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+            "img-src 'self' https://pbs.twimg.com https://*.fbcdn.net https://*.cdninstagram.com https://*.ytimg.com https://*.ggpht.com https://*.googleusercontent.com https://*.licdn.com https://*.tiktokcdn.com https://*.tiktokcdn-us.com data:; media-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
         return response

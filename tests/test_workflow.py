@@ -88,8 +88,11 @@ class WorkflowTests(AppTest):
             self.assertEqual(d["score"],87)
             self.assertEqual(d["status"],"draft")
             self.assertEqual(storage.action_count_today(),0)
+            repeated=self.post("/api/generate/reply",{"feed_id":f["id"]}).json()
+            self.assertEqual(repeated["id"],d["id"])
+            self.assertEqual(factory.return_value.generate_reply.await_count,1)
             factory.return_value.generate_reply.return_value="SKIP"
-            self.assertTrue(self.post("/api/generate/reply",{"feed_id":f["id"]}).json()["skipped"])
+            self.assertTrue(self.post("/api/generate/reply",{"feed_id":f["id"],"draft_id":d["id"]}).json()["skipped"])
         self.assertEqual(db.one("SELECT ignored FROM feed_items")["ignored"],1)
         prefs.save({"daily_ai_limit":1})
         with self.assertRaises(ValueError):
