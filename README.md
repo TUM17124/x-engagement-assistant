@@ -1,142 +1,145 @@
-# X Engagement Assistant
+# Social Engagement Command Center
 
-**AI drafts. You decide.**
+**Find useful conversations. Prepare thoughtful responses. Keep control of every public action.**
 
-An open-source desktop workspace for founders, creators, developers, brands, and anyone who wants to join better conversations on X. Find relevant posts, prepare thoughtful replies, write original content, and keep every publishing decision in your hands.
+An open-source local desktop workspace for founders, creators, developers, and small teams. Originally X Engagement Assistant, it combines supported social accounts, a review inbox, content tools, and an application-only AI Terminal.
 
-## What you get
+AI helps discover, summarize, rank, draft, and organize. You review, edit, and approve. There is no mass-reply, follow, like, or DM automation.
 
-- **Less blank-page time:** contextual replies, original posts, threads, hooks, rewrites, and alternatives.
-- **A focused engagement routine:** a mini feed, favorite-account watchlist, Topic Radar, and a scored Engagement Queue.
-- **Control of your public voice:** review, edit, approve exact content, then publish or open X's manual reply composer.
-- **Two discovery modes:** paid official X API search inside the app, or free manual X web search with copy/paste import.
-- **Clear boundaries:** duplicate and similar-content checks, daily/hourly write limits, AI/search budgets, and repeated-author limits.
-- **A local record:** activity history, draft acceptance rate, top engaged accounts/topics, and portable backups.
+## Install and start
 
-No promised growth numbers, fabricated impressions, scraping, or autonomous reply campaigns.
+Windows is the first supported desktop target. Run the NSIS installer from a tested release/build, launch **Social Engagement Command Center**, and complete onboarding. End users do not install Python, Node.js, Rust, or Git and do not edit an environment file.
 
-## Install and get started
+1. Choose **Continue with ChatGPT**, or explicitly select another AI provider.
+2. Authorize in your normal browser. Return to the app and choose an available model.
+3. Connect social accounts independently, or start with manual post import.
+4. Add interests and watched accounts.
+5. Open **AI Terminal**, enter **help**, and review drafts in Response Inbox / Approval Center.
 
-Windows is the first supported desktop target. Download **X-Engagement-Assistant-Setup.exe** from a published release, or the **X-Engagement-Assistant-Windows** artifact in [Windows desktop builds](https://github.com/TUM17124/x-engagement-assistant/actions/workflows/windows.yml).
+This development release is unsigned. See [BUILD.md](docs/BUILD.md). A public installer exists only when it appears on the repository's Releases page.
 
-The installer bundles the Python backend/runtime. End users do **not** install Python, use a terminal, run uvicorn, or edit `.env`. Windows WebView2 is installed by the installer when needed; that step requires internet access.
+## What you can do
 
-1. Install and launch **X Engagement Assistant**.
-2. Complete the six-step onboarding wizard.
-3. Enter your own X and AI credentials in Settings.
-4. Connect X in your system browser.
-5. Add interests and favorite accounts.
-6. Search/import a post, generate a draft, edit it, approve it, and choose how to reply.
+- Discover X conversations through official paid API search, with a same-query free X web-search fallback.
+- Import URLs and post text without paid read access.
+- Review a unified feed and contextual AI response suggestions.
+- Track favorite accounts, topics, and locally observed trends.
+- Use natural language or explicit commands to operate the same services as the graphical interface.
+- Prepare recurring, bounded discovery/drafting workflows that finish at human review.
+- Write platform-specific posts, keep a local media library, and schedule approved originals or manual reminders.
+- Track actual local actions, provider usage, drafts, and approval rates.
+- Export settings without secrets, drafts, history, and a SQLite backup.
 
-You can skip X API connection and use manual discovery/replies. An AI endpoint is required for AI features.
+See [platform capabilities and limitations](docs/SOCIAL-PROVIDERS.md). API access, app review, account type, region, and platform charges affect individual features.
 
-## Discovery: paid API or free web search
+## Continue with ChatGPT
 
-**Settings -> X Connection -> Discovery Mode**
+The app implements OpenAI's documented public-client flow for open-source/local applications. A stable installation ID lives in private app data. The backend opens OpenAI authorization in the system browser, uses dynamic registration on first connection, verifies identity, and keeps tokens in OS-protected storage.
 
-| Mode | Behavior |
-| --- | --- |
-| Automatic | On a requested search, tries the official API. Billing/access failures offer the same query on X.com. |
-| X API Search | Uses `GET /2/tweets/search/recent` with your bearer token or OAuth credentials; results enter Feed. Access errors still offer a manual fallback. |
-| X Web Search | Opens X.com search; no paid API search request is made. Paste a post back into Feed. |
+**ChatGPT Plan: Enabled** appears only when the returned grant permits plan usage. Models come from the connected account's catalog. Inference uses streamed Responses requests. Saved account/workspace registrations stay separate. AI settings provides reconnect, account selection, sign out, and Manage Usage.
 
-Queries support boolean operators, language and author filters, exclusion of retweets/replies, and 10-100 maximum results. Returned author information and public metrics are displayed when provided.
+Eligibility and usage limits apply. App or account limits may stop inference. Open **Manage ChatGPT Usage**, then explicitly retry or choose another provider. The app never silently switches to paid API-key usage.
 
-The app shows API search availability, searches today, and posts retrieved today. A 402 is remembered: it is **not repeatedly retried**. After fixing access, use **Retest search access on next search**. Rate-limit backoff remains in force. No dollar-cost estimates are fabricated.
+ChatGPT connection grants no access to ChatGPT conversations, memory, or social accounts. X API costs remain separate.
 
-Background monitoring is **off by default**. Enabling it requires an explicit setting, a minimum 15-minute interval, and a daily search budget. The default interval is 30 minutes and default search cap is 20 per UTC day.
+OAuth and inference contracts have automated mocked tests. On 2026-10-02 the installed Windows app also completed real browser authorization, received plan permission and the account model catalog, and streamed a completed terminal response. Eligibility and available models still depend on each account. See [verification details](docs/IMPLEMENTATION-REPORT.md).
 
-## Workspace screens
+Official references: [registration](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), [accounts and refresh](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions), [models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference), [usage/error recovery](https://developers.openai.com/siwc/token-sharing-open-source/errors-and-recovery).
 
-| Screen | Features |
-| --- | --- |
-| Home | Connection state, provider/model, waiting drafts, scheduled posts, today's writes, watchlist updates, and local analytics. |
-| Feed | Official API results, watchlist/topic posts, manual imports, avatars/metrics when available, save/ignore, open on X, generate reply. |
-| Engagement Queue | Original post, suggested reply, reason, relevance score, topic, edit/regenerate/style tools, skip, mute author/topic. AI can return SKIP. |
-| Approval Center | Replies, originals, threads, quotes, and scheduled content. Editing clears approval. |
-| Compose | Original post, thread, quote, saved draft; generation, rewriting, shortening, tone changes, hooks, alternatives, repetition review. |
-| Schedule | Local-time queue and month calendar; approved original posts only; edit, cancel, publish now. |
-| Watchlist | Account enable/disable, priority, topics, draft preparation, notification preferences, last-seen tracking, open latest posts on X. |
-| Topic Radar | Keywords, exclusions, languages, priority, custom/AI-assisted queries, official API or manual search. |
-| History | Generated vs final text, action, timestamp, post ID, account, provider/model, manual/API channel, status and errors. |
-| Settings | X credentials/discovery, AI provider, Writing Voice, My Product, appearance/tray/notifications, safety, data and backup. |
+## Optional AI providers
 
-Supported AI adapters: **Gemini**, **OpenAI**, **OpenAI-compatible API**, and **local Ollama**. Configure the provider and exact model identifier in the app. Credentials are kept separately per AI provider.
+Settings supports ChatGPT Plan, Gemini, OpenAI API key, an OpenAI-compatible endpoint, and local Ollama. Existing saved provider configuration is preserved. Enter keys in the UI; each provider's key is stored separately through the OS vault. Ollama needs a local server/model.
 
-## Publishing and scheduling rules
+An environment file is an optional contributor mechanism. Source runs can import the existing AI_BASE_URL, AI_API_KEY, and AI_MODEL configuration once. Bundled builds never load .env.
 
-- Generating, scoring, rewriting, and approving never publish.
-- Publishing requires an explicit action after approval of the exact content.
-- Replies are never bulk-sent or scheduled automatically.
-- Only an explicitly approved and scheduled **original post** can publish automatically.
-- Threads require approval of the entire thread. Partial failures are recorded and not automatically replayed.
-- Editing cancels approval and an existing pending schedule.
-- **The app must remain running for schedules.** Optional tray mode can keep it running when its window closes. No startup task/service is installed.
-- Missed schedules are marked for review on restart. Interrupted sends are marked uncertain, never blindly retried.
-- Manual composer opens are recorded as **opened**, not published. They do not inflate API write counts or success metrics.
+## AI Terminal
 
-## Privacy and credentials
+This is an application command interface, **not CMD, PowerShell, Bash, or a code-execution shell**.
 
-Windows uses **DPAPI**, scoped to the current Windows user, for retrievable API credentials, session secrets, and OAuth tokens. Other platforms require a supported OS keychain; there is no plaintext fallback.
+    help
+    status
+    accounts
+    login
+    scan x
+    search "AI agents" lang:en -is:retweet
+    watch @favoriteperson
+    watched
+    scan trends
+    draft reply <imported-post-id>
+    draft post about lessons from shipping a small product
+    generate ideas accessible PDF editing
+    show drafts
+    show approvals
+    approve 12
+    schedule 12 tomorrow 8am
+    show automations
+    pause automation 3
 
-Secrets are masked after saving, can be revealed for 15 seconds, replaced, or deleted. They are not stored in SQLite, source files, logs, browser localStorage, or exports.
+Natural language uses the selected AI provider to produce a validated plan. For example:
 
-Windows data lives in `%LOCALAPPDATA%\XEngagementAssistant`. SQLite stores workspace content, metadata, and versioned migrations. Backups exclude secrets; restored drafts need fresh approval and restored schedules are cancelled.
+> Every morning at 7 scan X for AI engineering discussions and prepare up to five replies.
 
-Drafting sends source text and author plus your chosen writing/product context to your configured AI endpoint. Cloud AI is not local inference. API discovery and publishing communicate with X. See [secure configuration](docs/SECURITY.md).
+The recurring workflow and its costs are shown for review before activation. That workflow cannot publish replies.
 
-To migrate the original developer app, use **Settings -> Data & Backup -> Migrate the original developer app** and select its engagement.db. History and available OAuth tokens are imported without overwriting an existing login. Keep the original file private; it may contain old plaintext tokens.
+Commands stream progress and ChatGPT text. Stop cancels the operation; completed local work remains visible. Arrow keys recall history, /search searches it, and Clear clears the display. History stays local. Never paste credentials into the terminal.
 
-## Service limitations
+[Full command reference](docs/AI-TERMINAL.md)
 
-X API read/write access, credits, rate limits, and reply permissions are controlled by X. AI access and credits are controlled by your AI provider. The app explains errors and offers manual discovery/reply alternatives; it does not bypass restrictions.
+## Approval and scheduling
 
-Local analytics describe this app's recorded activity, not follower growth or account-wide reach. Feed metrics are shown only when returned by X.
+Drafting never publishes. Approval binds exact platform, target, text, selected account, and attached media context. Editing invalidates approval.
 
-This is a **local single-user application**, not a hosted multi-user service. Windows packages are unsigned unless a maintainer configures code signing; Windows may show an unknown-publisher warning.
+Terminal publishing, scheduling, automation activation, and destructive actions create review requests. A model cannot confirm its own request. GUI controls and terminal commands call the same underlying services.
 
-## Development and builds
+Only explicitly approved original posts with a supported API path can publish on schedule. Replies/comments use manual reminders. Keep the app running or enable optional tray mode. No startup service is installed. Missed schedules require review; interrupted writes are not blindly retried.
 
-Contributors need Python 3.13, Node.js, and (for desktop builds) Rust, the Microsoft C++ build tools/Windows SDK, and WebView2. End users do not.
+Automations persist in SQLite, run bounded reads/drafting, and keep step/run history. They wait for review when drafts are ready. Resume explicitly after review or a connection/usage failure. Interrupted runs remain paused; missed runs do not produce catch-up bursts.
 
-```powershell
-git clone https://github.com/TUM17124/x-engagement-assistant.git
-cd x-engagement-assistant
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements-build.txt
-npm ci
-git config core.hooksPath .githooks
-uvicorn app.main:app --host 127.0.0.1 --port 8787 --reload --no-access-log
-```
+## Watchlist, trends, and memory
 
-Open localhost:8787 for browser development. Configure in the UI. `.env` is optional for developers and is never loaded by packaged builds.
+Watchlist monitoring uses official access and configured intervals. Some networks cannot monitor arbitrary creators; Open Original and manual import remain available.
 
-Desktop development / Windows installer:
+Trend Radar compares counts in **your local retrieved/imported sample** across two 24-hour windows. It is not a global trend feed or virality prediction. Impressions and follower growth are never invented.
 
-```powershell
-python scripts/make_icons.py
-python scripts/build_backend.py
-npm run desktop:dev
-# Close the development app, then:
-python scripts/collect_notices.py
-npm run desktop:build
-```
+Writing Voice, Brand Voice, My Profile, and visible application preferences provide optional context. Inspect or clear this app's memory in Settings. Edits do not silently create hidden profiles.
 
-Do not leave a separate server running on port 8787 when launching the desktop shell. The shell owns its bundled backend. Installer output: `src-tauri/target/release/bundle/nsis/`.
+## Media and backup
 
-Detailed instructions: [build and uninstall](docs/BUILD.md), [architecture](docs/ARCHITECTURE.md), [contributing](CONTRIBUTING.md), [screenshots](docs/screenshots/README.md).
+Upload supported PNG, JPEG, WEBP, GIF, or MP4 files to the local library. Crop/resize creates a derivative and preserves the original. Captions, alt text, tags, folders, favorites, and reuse are available. Optional vision assistance sends a resized image to the selected compatible provider after an explicit action. Image generation has a separate provider. The ChatGPT adapter currently handles text; image assistance requires a separately selected vision-capable provider.
 
-## Tests
+API media publishing currently supports Facebook Page PNG/JPEG images. Other media publishing uses manual handoff. SQLite backups include media metadata, **not media files**; preserve/export files separately.
 
-```powershell
-python -B -m unittest discover -s tests -v
-node scripts/check_ui.cjs
-python -B scripts/secret_scan.py
-```
+Data exports exclude the credential vault. Restored drafts need fresh approval, schedules are cancelled, and automations are paused.
 
-External APIs are mocked and storage is isolated. Tests never publish real X posts. No browser automation is used.
+## Troubleshooting
 
-## License
+- **ChatGPT needs renewal:** reconnect the saved registration.
+- **Plan usage disabled:** enable browser consent or explicitly choose another provider.
+- **Usage limit reached:** Manage ChatGPT Usage; there is no paid fallback.
+- **Model unavailable:** refresh the model list and select an offered model.
+- **X 402 / no credits:** use Open Search on X; repeated automatic search retries stop.
+- **Social permission denied:** check approved scopes/account type; use manual import meanwhile.
+- **Missed schedule:** keep the app running and explicitly reschedule.
+- **Loading screen:** quit another local instance that may own port 8787.
 
-[MIT](LICENSE). Third-party components retain their own licenses; see [dependency licensing](docs/LICENSES.md).
+## Contributor development
+
+The frontend is plain JavaScript/CSS served by FastAPI. Tauri wraps the local app and bundles Python. SQLite is the only database.
+
+    py -3.13 -m venv .venv
+    .\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+    npm ci
+    .\.venv\Scripts\python.exe -B -m uvicorn app.main:app --host 127.0.0.1 --port 8787 --no-access-log
+
+For tests and desktop development:
+
+    .\.venv\Scripts\python.exe -B -m unittest discover -s tests -v
+    npm run check:ui
+    .\.venv\Scripts\python.exe scripts/build_backend.py
+    npm run desktop:dev
+
+Do not run development and desktop servers on port 8787 simultaneously.
+
+See [architecture](docs/ARCHITECTURE.md), [build instructions](docs/BUILD.md), [provider guide](docs/SOCIAL-PROVIDERS.md), [contributing](CONTRIBUTING.md), and [credential model](docs/SECURITY.md).
+
+MIT licensed. Dependencies retain their own licenses; see [license notes](docs/LICENSES.md) and generated third-party notices.

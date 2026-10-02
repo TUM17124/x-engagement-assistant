@@ -21,3 +21,9 @@ If a real secret is ever committed, deleting it in a later commit is not suffici
 The app does not scrape X, collect cookies, evade platform limits, or automate mass replies. API reading and publishing use official endpoints. Approval protections are enforced by the backend, not merely by hiding UI buttons.
 
 It is a local single-user app. Do not expose its port to a network or deploy it as a public service.
+
+## ChatGPT connection and terminal
+
+ChatGPT OAuth tokens, refresh tokens and retained ID tokens have no renderer reveal route. They remain in the existing OS vault. A temporary loopback listener processes browser callbacks in the backend. The UI receives account metadata and permission state only.
+
+The terminal is an application command interface, with no operating-system shell. Tools validate model-provided arguments. External/destructive requests require a separate human confirmation; social posts cannot grant permissions. See AI-TERMINAL.md for the implemented boundaries.

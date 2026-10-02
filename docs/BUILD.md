@@ -1,40 +1,58 @@
-# Windows desktop build and lifecycle
+# Windows desktop build
 
-## Contributor prerequisites
+## Build-machine prerequisites
 
-Windows 10/11 x64, Python 3.13, Node.js 22+, stable Rust with the MSVC target, Microsoft C++ build tools and Windows SDK, and WebView2.
+Windows 10/11 x64, Python 3.13, Node.js 22+, stable Rust/MSVC, Visual Studio C++ Build Tools and Windows SDK. End users need none of these development tools. The installer bootstraps WebView2 if missing.
 
-See [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) and [Windows installers](https://v2.tauri.app/distribute/windows-installer/).
+## Exact commands
 
-## Build
+From the repository root in PowerShell:
 
-1. Create/activate a virtualenv and install `requirements-build.txt`.
-2. Run `npm ci`.
-3. Run `python scripts/make_icons.py`.
-4. Run `python scripts/build_backend.py`.
-5. Run `python scripts/collect_notices.py
-npm run desktop:build`.
+    py -3.13 -m venv .venv
+    .\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+    npm ci
+    .\.venv\Scripts\python.exe -B -m unittest discover -s tests -v
+    npm run check:ui
+    .\.venv\Scripts\python.exe scripts/make_icons.py
+    .\.venv\Scripts\python.exe scripts/build_backend.py
+    cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1 > $null
+    .\.venv\Scripts\python.exe scripts/collect_notices.py
+    npm run desktop:build
 
-The backend step creates a self-contained sidecar named `src-tauri/binaries/xea-backend-x86_64-pc-windows-msvc.exe`. No system Python is needed by the resulting installer.
+If Rust was installed during the current shell session:
 
-The Tauri build outputs an NSIS setup executable under `src-tauri/target/release/bundle/nsis/`. The Windows CI workflow copies it to `X-Engagement-Assistant-Setup.exe` and supplies a SHA-256 checksum.
+    $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
 
-Desktop development uses `npm run desktop:dev` after building the sidecar. Rebuild the sidecar after changing Python/UI code. For rapid browser development, use uvicorn instead; do not run both on port 8787 simultaneously.
+The backend output is src-tauri/binaries/xea-backend-x86_64-pc-windows-msvc.exe. It contains Python and dependencies.
+
+The installer output is:
+
+    src-tauri/target/release/bundle/nsis/Social Engagement Command Center_0.3.0_x64-setup.exe
+
+Verify the sidecar with isolated data and no external API calls:
+
+    .\.venv\Scripts\python.exe scripts/smoke_backend.py src-tauri/binaries/xea-backend-x86_64-pc-windows-msvc.exe
+
+Desktop development:
+
+    npm run desktop:dev
+
+Rebuild the sidecar after Python/UI edits. For quick browser development:
+
+    .\.venv\Scripts\python.exe -B -m uvicorn app.main:app --host 127.0.0.1 --port 8787 --no-access-log
+
+Do not run both servers simultaneously on port 8787.
+
+## Lifecycle
+
+Tauri owns the backend child process, waits for a private health check, then displays the loopback UI. Closing quits unless tray mode is enabled. Quit stops scheduling/monitoring. No startup task/service is installed.
+
+Installation is per-user. Uninstall through Windows Settings. The uninstaller asks whether to remove local data; keeping it is the default. Data and DPAPI credentials remain in %LOCALAPPDATA%\XEngagementAssistant, preserving the original upgrade path.
+
+Builds are unsigned unless the maintainer configures Authenticode. Packaging does not establish platform app-review approval or ChatGPT eligibility.
 
 ## CI
 
-The Windows desktop workflow runs Python tests, UI checks and a secret scan, bundles the backend, compiles Tauri, and uploads the installer/checksum. It can run on a push or manually from Actions. No X/AI credentials are required or supplied to CI.
+.github/workflows/windows.yml runs mocked tests/UI checks and builds artifacts. GitHub Actions previously could not obtain a runner because of the account's billing/lock state. Local build results are independent of that restriction.
 
-## Installation and uninstall
-
-The installer is per-user and includes application shortcuts and a standard Windows uninstaller. WebView2's bootstrapper runs only if needed. The app does not register startup tasks or services.
-
-Uninstall through Windows Settings -> Apps. The program and shortcuts are removed. The uninstaller asks whether to delete workspace data and credentials; No is the default. After exporting anything you need, you can also remove `%LOCALAPPDATA%\XEngagementAssistant` to delete the database and DPAPI-encrypted credentials. Credentials from this directory are bound to that Windows user.
-
-Do not sign releases with a key stored in the repository. Authenticode signing is a maintainer/release configuration step; unsigned development builds may trigger SmartScreen.
-
-## Runtime behavior
-
-One backend owns the workspace lock. The Tauri shell waits for its own private authenticated health endpoint before navigating to the UI. If startup remains on the loading page, check for a conflicting process on port 8787.
-
-Closing the window quits unless the user enabled tray mode. Quit always stops scheduling. No catch-up burst runs on restart; missed schedules need explicit review.
+See [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) and [Windows installers](https://v2.tauri.app/distribute/windows-installer/).

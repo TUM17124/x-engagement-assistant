@@ -1,20 +1,17 @@
 # Contributing
 
-Use the development and build steps in README. Keep changes small and runnable.
+Extend the existing FastAPI/Tauri app incrementally. Preserve paid X search, web fallback, OAuth, manual import, provider configuration, and approval-first publishing.
 
-Run:
-```
-python -B -m unittest discover -s tests -v
-node scripts/check_ui.cjs
-python -B scripts/secret_scan.py
-```
+Read [architecture](docs/ARCHITECTURE.md), [build instructions](docs/BUILD.md), [AI Terminal](docs/AI-TERMINAL.md), and [social adapters](docs/SOCIAL-PROVIDERS.md).
 
-Enable `.githooks` with `git config core.hooksPath .githooks`.
+    py -3.13 -m venv .venv
+    .\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+    npm ci
+    .\.venv\Scripts\python.exe -B -m unittest discover -s tests -v
+    npm run check:ui
 
-Tests must mock X/AI requests and use isolated storage. Never publish a real post to test a code path. Do not add browser scraping or private endpoints.
+Tests use temporary databases and a test vault; unmocked async network calls fail. Never test real social publishing, replies, comments, likes, follows, DMs, or media uploads.
 
-Preserve exact-content approval, no scheduled replies, no automatic replay of uncertain sends, OS-protected secrets, and manual alternatives when read access is unavailable.
+The optional .env.example is for contributors. Never commit secrets, local databases, private media, or ChatGPT installation records.
 
-Add a versioned database migration for schema changes. A backup restore must not import credentials or resurrect approved schedules.
-
-The interface uses local HTML/CSS/JavaScript; all source content and AI output must be escaped before rendering. Keep provider errors user-readable without including keys or raw response bodies.
+Register tools with typed schemas. Never expose a shell, credentials, or model self-approval. Document dependencies and regenerate third-party notices before distribution.

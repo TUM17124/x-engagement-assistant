@@ -25,6 +25,12 @@
   },
   {
     "ecosystem": "Python",
+    "name": "cffi",
+    "version": "2.1.1",
+    "license": "MIT-0"
+  },
+  {
+    "ecosystem": "Python",
     "name": "click",
     "version": "8.5.0",
     "license": "BSD-3-Clause"
@@ -34,6 +40,12 @@
     "name": "colorama",
     "version": "0.4.6",
     "license": "See upstream notices"
+  },
+  {
+    "ecosystem": "Python",
+    "name": "cryptography",
+    "version": "50.0.2",
+    "license": "Apache-2.0 OR BSD-3-Clause"
   },
   {
     "ecosystem": "Python",
@@ -145,6 +157,12 @@
   },
   {
     "ecosystem": "Python",
+    "name": "pycparser",
+    "version": "3.0",
+    "license": "BSD-3-Clause"
+  },
+  {
+    "ecosystem": "Python",
     "name": "pydantic",
     "version": "2.13.5",
     "license": "MIT"
@@ -166,6 +184,12 @@
     "name": "pyinstaller-hooks-contrib",
     "version": "2026.8",
     "license": "See upstream notices"
+  },
+  {
+    "ecosystem": "Python",
+    "name": "PyJWT",
+    "version": "2.15.1",
+    "license": "MIT"
   },
   {
     "ecosystem": "Python",
