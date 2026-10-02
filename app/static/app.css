@@ -14,3 +14,5 @@
 .terminal-shell form,.terminal-shell>.row{padding:12px 24px}
 .approval-request{border:1px solid #a6b1ee55}
 .sidebar .nav{overflow:auto;flex:1;min-height:0}
+
+.action-progress{position:sticky;top:8px;z-index:5}.error-box:focus{outline:2px solid var(--accent,#72d8b0)}button[aria-busy="true"]{cursor:progress}.error-box .row{margin-top:12px}.error-box p{white-space:pre-wrap}

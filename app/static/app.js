@@ -12,8 +12,48 @@ const check=(l,n,v)=>'<label class="check"><input type="checkbox" name="'+n+'" '
 const select=(l,n,v,opts)=>'<label>'+l+'<select name="'+n+'">'+opts.map(o=>{const [k,t]=Array.isArray(o)?o:[o,o];return '<option value="'+esc(k)+'" '+(v===k?'selected':'')+'>'+esc(t)+'</option>'}).join('')+'</select></label>';
 const empty=(t,d,a='')=>'<div class="empty"><div class="empty-icon">&#10022;</div><h2>'+t+'</h2><p>'+d+'</p>'+a+'</div>';
 function toast(m){const el=$('#toast');el.textContent=m;el.style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.style.display='none',7000)}
-async function api(path,method='GET',body){const multi=body instanceof FormData;const r=await fetch(path,{method,headers:{...(!multi?{'Content-Type':'application/json'}:{}),'X-CSRF-Token':csrf},...(body!==undefined?{body:multi?body:JSON.stringify(body)}:{})});const d=await r.json();if(!r.ok){const e=Error(d.error||(typeof d.detail==='string'?d.detail:'Check the supplied fields.'));e.technical=d.technical;throw e}return d}
-function errorPanel(e){$('#page-error')?.remove();const el=document.createElement('div');el.id='page-error';el.className='error-box';el.innerHTML=esc(e.message)+(e.technical?'<details><summary>Technical details</summary>'+esc(e.technical)+'</details>':'');($('.content')||$('.onboarding')||$('#app')).prepend(el)}
+function responseError(data,status){
+ const fields=Array.isArray(data?.detail)?data.detail.map(d=>{const name=(d.loc||[]).filter(x=>x!=='body').join(' / ');return (name?name+': ':'')+(d.msg||'Check this value');}).join('; '):'';
+ const defaults={401:'This connection needs authorization. Open Settings and test the selected provider.',403:'This action is not permitted. Check the connection and permissions in Settings.',404:'This action or item is no longer available. Refresh the page.',413:'The file is too large. Choose a smaller file.',422:'Check the required fields and try again.',429:'The service is rate limited. Wait before trying again.'};
+ const e=Error(data?.error||(typeof data?.detail==='string'?data.detail:fields)||defaults[status]||'The app could not complete this request. Check History before repeating a publishing action.');
+ e.status=status;e.technical=data?.technical||('App HTTP '+status);e.hint=data?.hint||'';return e;
+}
+async function api(path,method='GET',body,options={}){
+ const multi=body instanceof FormData,controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),options.timeoutMs??(method==='GET'?30000:180000));
+ let response;
+ try{
+  response=await fetch(path,{method,signal:controller.signal,headers:{...(!multi?{'Content-Type':'application/json'}:{}),'X-CSRF-Token':csrf},...(body!==undefined?{body:multi?body:JSON.stringify(body)}:{})});
+  if(response.status===204)return {};
+  let data;try{data=await response.json()}catch(error){if(error.name==='AbortError')throw error;throw responseError({error:'The app returned an unreadable response. Reopen the app; check History before retrying a publishing action.'},response.status)}
+  if(!response.ok)throw responseError(data,response.status);return data;
+ }catch(error){
+  if(error.name==='AbortError'||error instanceof TypeError){
+   const e=Error(error.name==='AbortError'?'This request took too long. Check your connection and the selected provider.':'The local app connection was interrupted. Reopen the app and check your connection.');
+   e.hint=method==='GET'?'Try again after the connection is restored.':'The operation may have finished even though no response arrived. Check History or the relevant list before trying again; publishing was not retried automatically.';throw e;
+  }throw error;
+ }finally{clearTimeout(timer)}
+}
+function errorPanel(error,action=''){
+ $('#page-error')?.remove();const el=document.createElement('div');el.id='page-error';el.className='error-box';el.setAttribute('role','alert');el.tabIndex=-1;
+ el.innerHTML='<strong>'+esc(action?String(action).trim()+' could not finish':'Something needs attention')+'</strong><p>'+esc(error?.message||'The action could not be completed.')+'</p>'+(error?.hint?'<p>'+esc(error.hint)+'</p>':'')+(error?.technical?'<details><summary>Technical details</summary>'+esc(error.technical)+'</details>':'')+'<div class="row"><a href="#settings">Open Settings</a><a href="#history">Check History</a><button type="button" data-dismiss-error>Dismiss</button></div>';
+ ($('.content')||$('.onboarding')||$('#app')).prepend(el);el.scrollIntoView?.({block:'nearest',behavior:'smooth'});el.focus?.({preventScroll:true});
+}
+async function runUIAction(button,operation,label=''){
+ if(button?.dataset.busy)return;
+ const title=label||button?.textContent?.trim()||'Action';let progress;
+ const disabled=button?.disabled;
+ if(button){button.dataset.busy='true';button.disabled=true;button.setAttribute('aria-busy','true')}
+ $('#page-error')?.remove();
+ try{
+  progress=document.createElement('div');progress.className='notice action-progress';progress.setAttribute('role','status');progress.textContent=title+' ? working?';
+  ($('.content')||$('.onboarding')||$('#app')).prepend(progress);
+  return await operation();
+ }catch(error){errorPanel(error,title)}finally{
+  progress?.remove();if(button){delete button.dataset.busy;button.disabled=disabled;button.removeAttribute('aria-busy')}
+ }
+}
+document.addEventListener('click',e=>{if(e.target.closest('[data-dismiss-error]'))$('#page-error')?.remove()});
 function values(f){return Object.fromEntries(new FormData(f))}
 function openExternal(u){if(window.__XEA_DESKTOP__){window.location.href=u}else{window.open(u,'_blank','noopener,noreferrer')}}
 const nav=[['home','','Home'],['terminal','','AI Terminal'],['automations','','Automations'],['control-approvals','','Approval Center'],['feed','','Social Feed'],['queue','','Response Inbox'],['trends','','Trend Radar'],['create','','Create'],['schedule','','Schedule'],['watchlist','','Watchlist'],['market','','Market Watch'],['ideas','','Ideas'],['media','','Media'],['analytics','','Analytics'],['history','','History'],['settings','','Settings']];
@@ -41,7 +81,7 @@ if(route==='ideas')html=await ideasPage();
 if(route==='media')html=await mediaPage();
 if(route==='analytics')html=await analyticsPage();
 if(route==='listener')html=listenerPage();
-if(route==='planner')html=plannerPage();
+if(route==='planner')html=await plannerPage();
 if(route==='topics')html=topicsPage(await api('/api/topics'));
 if(route==='history')html=heading('Activity history','Your edits, approvals, API results, and manual composer actions.')+'<form id="history-filter" class="row">'+select('Action','action','',['','post','reply','quote','approved','reply_skipped','scheduled','manual_composer_opened'])+select('Status','status','',['','published','approved','skipped','failed','uncertain','opened'])+select('Channel','channel','',['','API','manual','local'])+'<button type="submit">Filter</button></form><div class="card" id="history-results">'+historyTable(await api('/api/history'))+'</div>';
 if(route==='settings'){await refreshChatGPT();if(settingsTab==='ai'&&chatgptState.plan_usage&&!chatgptModels.length){try{await refreshChatGPT(true)}catch(e){toast(e.message)}}accountsCache=await api('/api/social/accounts');usageCache=await api('/api/social/usage');secretMasks=(await api('/api/settings')).secrets;html=settingsPage(await api('/api/mutes'))}

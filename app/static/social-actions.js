@@ -245,12 +245,15 @@ async function msAction(a, id, el) {
         : "Recommend a few useful daily actions with reasons; no volume target";
     const d = await api("/api/social/suggest", "POST", {
       task,
+      platform:a === "weekly-plan" ? $('[name="planner_platform"]').value : 'x',
+      timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,
       text:
         a === "daily-advice"
           ? JSON.stringify(await api("/api/social/brief"))
-          : "",
+          : $('[name="planner_goal"]').value,
     });
-    $("#" + a).innerHTML = suggestionOutput(d.text);
+    const target=$("#" + a);if(target)target.innerHTML = suggestionOutput(d.text);
+    toast(a === "weekly-plan" ? "Weekly plan saved locally. Nothing was scheduled." : "Suggestions ready");
     return;
   }
   if (a === "media-assist") {
@@ -302,6 +305,7 @@ async function msAction(a, id, el) {
     await api("/api/social/data", "DELETE", { confirm: "DELETE" });
     return start();
   }
+  throw Error('This action is unavailable in this app version. Refresh the page and try again.');
 }
 async function msSubmit(f) {
   const d = values(f);

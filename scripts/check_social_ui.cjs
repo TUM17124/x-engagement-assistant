@@ -47,6 +47,7 @@ api=async path=>emptyAPI[path]||[];
 );
 (async () => {
   for (const expr of [
+    "plannerPage()",
     "terminalPage()",
     "automationPage()",
     "controlApprovalsPage()",

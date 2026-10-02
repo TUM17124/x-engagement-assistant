@@ -58,3 +58,35 @@ ChatGPT inference requests disable storage and enable streaming. Only response.c
 The backend owns dynamic registration, loopback callbacks, JWT verification, refresh, revocation, and OS-vault storage. The renderer receives account metadata, states, and model names only. A stable UUIDv4 URI identifies the installation. Each saved account/workspace retains its own issued client ID and tokens.
 
 Live acceptance still requires browser consent and completed inference with an eligible account. Mocked tests do not establish eligibility or real account access.
+
+
+## Conversational control and typed confirmations
+
+The terminal calls the same services as the GUI. Tool results include grounded readable feedback and expandable result details. It can inspect accounts, explain connection setup, start configured OAuth, navigate to screens, generate a weekly plan, import text, draft/edit/skip, prepare publishing or manual handoff, inspect schedules/history/analytics/media, save ideas and review changes to selected settings. File selection and credential entry remain in their dedicated secure GUI forms.
+
+Examples:
+
+    is Facebook connected?
+    how do I connect fb
+    connect facebook
+    test x
+    weekly plan
+    show history
+    show schedule
+    show analytics
+    show media
+    open planner
+    publish 12
+    yes
+
+A publishing request first displays the exact draft and selected account. Typing yes confirms only that one displayed request using its stored ID and content checksum. Typing no rejects it. A second yes cannot repeat the action. Editing the content or changing the connected account invalidates the preview. Multiple pending actions require their individual buttons; yes is not blanket permission. The model has no confirmation tool, and source posts cannot supply confirmation.
+
+A confirmed publishing request now performs approval and publication together for that exact reviewed version. The separate approve command still only approves and never publishes. Only the user's explicit confirmation can invoke these actions.
+
+Natural-language follow-ups receive recent user commands, assistant clarification messages, draft identifiers, watchlist metadata, and safe connection states. Retrieved post text is not inserted into command-routing instructions. The app gives connection guidance based on actual saved state; it does not claim that Facebook or another network is connected without credentials.
+
+## Action errors and progress
+
+All shared button/form action boundaries display a progress indicator and persistent, named error messages. Errors offer Settings and History links and expandable technical details. Field validation identifies the field; dropped connections and timeouts explain that an operation may have completed and must be checked before retrying. The app never automatically retries publishing. ChatGPT Plan and OpenAI API-key failures are labeled separately.
+
+The weekly Planner uses dedicated planning instructions, the user's interests and topics, and seven local calendar dates. It saves its last successful result locally and keeps that result if generation fails. It never creates scheduled posts by itself.

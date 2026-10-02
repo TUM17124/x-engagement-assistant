@@ -6,7 +6,7 @@
   "scripts": {
     "desktop:dev": "tauri dev --no-dev-server",
     "desktop:build": "tauri build",
-    "check:ui": "node scripts/check_ui.cjs && node scripts/check_social_ui.cjs"
+    "check:ui": "node scripts/check_ui.cjs && node scripts/check_social_ui.cjs && node scripts/check_feedback.cjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.10.0"

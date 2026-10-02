@@ -44,7 +44,8 @@ if(a==='edit-topic'){editingTopic=(await api('/api/topics')).find(x=>x.id===Numb
 if(a==='delete-topic'){if(confirm('Remove this topic?'))await api('/api/topics/'+id,'DELETE');return render()}
 if(a==='refresh-topic'){const d=await api('/api/topics/'+id+'/refresh','POST');toast(d.items.length+' new posts imported. Check topic status if access is unavailable.');return render()}
 if(a==='topic-ai'){const f=$('#topic-form'),d=values(f);d.enabled=f.elements.enabled.checked;f.elements.query.value=(await api('/api/topics/suggest/query','POST',d)).query;return}
+throw Error('This action is unavailable in this app version. Reopen the app and try again.');
 }
-document.addEventListener('click',async e=>{const b=e.target.closest('[data-action]');if(!b)return;b.disabled=true;try{await doAction(b.dataset.action,b.dataset.id,b)}catch(error){errorPanel(error)}finally{b.disabled=false}});
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-action]');if(!b)return;await runUIAction(b,()=>doAction(b.dataset.action,b.dataset.id,b))});
 
 document.addEventListener('click',e=>{const a=e.target.closest('a[target="_blank"]');if(a&&window.__XEA_DESKTOP__){e.preventDefault();openExternal(a.href)}});

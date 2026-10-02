@@ -81,6 +81,8 @@ Natural language uses the selected AI provider to produce a validated plan. For 
 
 The recurring workflow and its costs are shown for review before activation. That workflow cannot publish replies.
 
+The terminal also explains connection setup, answers account-status questions, opens app screens and operates shared drafts, schedules, ideas, media metadata and analytics. After an exact action preview, type **yes** to confirm that single action or **no** to cancel. Editing the draft invalidates its preview. File uploads and credentials still use their dedicated GUI forms.
+
 Commands stream progress and ChatGPT text. Stop cancels the operation; completed local work remains visible. Arrow keys recall history, /search searches it, and Clear clears the display. History stays local. Never paste credentials into the terminal.
 
 [Full command reference](docs/AI-TERMINAL.md)
@@ -90,6 +92,8 @@ Commands stream progress and ChatGPT text. Stop cancels the operation; completed
 Drafting never publishes. Approval binds exact platform, target, text, selected account, and attached media context. Editing invalidates approval.
 
 Terminal publishing, scheduling, automation activation, and destructive actions create review requests. A model cannot confirm its own request. GUI controls and terminal commands call the same underlying services.
+
+The AI Planner creates a locally saved seven-day plan from your interests and available evidence. A plan is a suggestion, not a scheduled campaign.
 
 Only explicitly approved original posts with a supported API path can publish on schedule. Replies/comments use manual reminders. Keep the app running or enable optional tray mode. No startup service is installed. Missed schedules require review; interrupted writes are not blindly retried.
 

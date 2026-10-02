@@ -113,12 +113,46 @@ def accounts(_):
         "name":p.account.get("name",""),"capabilities":p.capabilities()}
         for name in PROVIDERS for p in [provider(name)]]
 
-@tool("accounts.connect","Open the existing connected-accounts screen.",Platform)
-def connect(a):
-    return {"navigate":"settings","message":"Use Connect on the "+a.platform+" account card. Social OAuth is separate from ChatGPT."}
+@tool("accounts.status","Explain whether one social account is connected and how to connect it.",Platform)
+def account_status(a):
+    from .social.routes import accounts as connection_cards
+    card=next(c for c in connection_cards() if c["platform"]==a.platform)
+    steps=["Open Settings > Connected Accounts > "+card["name"]+"."]
+    if a.platform=="x":
+        steps=["Open Settings > X Connection.","Save your X developer Client ID and callback URL, then choose Save & connect X."]
+    else:
+        steps += ["Register your own developer app with this platform and add the callback URL shown on the account card.",
+            "Enter its Client ID and Client Secret in the secure account form, then choose Save and Connect.",
+            "Authorize in the official browser window. Never paste your password, cookies or tokens into the terminal."]
+    if a.platform=="facebook":steps += ["Authorize access to Pages you manage, then select the returned Facebook Page in Connected Accounts. Personal profiles are not supported for API publishing."]
+    steps += ["Choose Test Connection. The card shows the permissions and actions this adapter supports."]
+    return {"platform":a.platform,"connected":card["connected"],"name":card["account"].get("name",""),
+        "api_status":card["account"].get("api_status","Not tested"),"capabilities":card["capabilities"],
+        "permissions":card["account"].get("permissions",""),"note":card["note"],"steps":steps,
+        "navigate":"settings","settings_tab":"x" if a.platform=="x" else "accounts"}
 
-@tool("ai.login","Open Continue with ChatGPT in AI settings.")
-def login(_):return {"navigate":"settings","settings_tab":"ai","message":"Choose Continue with ChatGPT."}
+@tool("accounts.connect","Start official social OAuth when configured, or explain the missing setup.",Platform)
+def connect(a):
+    info=account_status(a)
+    try:info["open_url"]=provider(a.platform).connect()
+    except ValueError as error:info["message"]=str(error)
+    return info
+
+@tool("accounts.test","Test a social account using its official profile endpoint.",Platform,rate_limit=6)
+async def account_test(a):
+    from .social.routes import test_connection
+    return await test_connection(a.platform)
+
+@tool("accounts.disconnect","Disconnect one social account locally; keep saved drafts.",Platform,Permission.DESTRUCTIVE)
+def account_disconnect(a):
+    from .social.routes import disconnect
+    return disconnect(a.platform)
+
+@tool("ai.login","Start official ChatGPT browser sign-in. Social accounts remain separate.",permission=Permission.DRAFT)
+async def login(_):
+    prefs.save({"ai_provider":"chatgpt"})
+    result=await auth.connect()
+    return {"message":"ChatGPT sign-in opened in your system browser. Complete authorization, then type status.","state":result["state"],"signing_in":result["signing_in"]}
 
 @tool("ai.logout","Sign out of the selected ChatGPT connection.",permission=Permission.DESTRUCTIVE)
 async def logout(_):return await auth.disconnect()
@@ -204,8 +238,10 @@ def approvals(_):
 @tool("approvals.approve","Ask the human to approve exact draft content; does not publish.",DraftID,Permission.EXTERNAL_ACTION)
 def approve(a):return ws.approve(a.draft_id)
 
-@tool("content.publish","Publish already-approved exact content only after separate human confirmation.",DraftID,Permission.EXTERNAL_ACTION,rate_limit=10)
-async def publish(a):return await ws.publish(a.draft_id)
+@tool("content.publish","Show exact content and account for human confirmation, then approve and publish that version.",DraftID,Permission.EXTERNAL_ACTION,rate_limit=10)
+async def publish(a):
+    ws.approve(a.draft_id)
+    return await ws.publish(a.draft_id)
 
 @tool("scheduler.create","Ask the human to approve exact content and time. API delivery supports originals only.",Schedule,Permission.EXTERNAL_ACTION)
 def schedule(a):
@@ -268,3 +304,79 @@ def memory_clear(_):
 
 @tool("system.settings","Open configuration in the app.")
 def settings(_):return {"navigate":"settings"}
+
+
+class Page(Args):
+    page:Literal["home","feed","queue","trends","create","schedule","watchlist","market","ideas","media","analytics","history","settings","terminal","automations","planner","control-approvals"]
+class PlanInput(Platform):
+    timezone:str="UTC"
+    goal:str=Field(default="",max_length=2000)
+class ImportPost(Platform):
+    text:str=Field(min_length=1,max_length=30000)
+    url:str=Field(default="",max_length=2048)
+    author:str=Field(default="",max_length=150)
+class IdeaInput(Args):
+    title:str=Field(min_length=1,max_length=200)
+    text:str=Field(min_length=1,max_length=20000)
+class EditDraft(DraftID):
+    text:str=Field(min_length=1,max_length=20000)
+class SafeSettings(Args):
+    interests:list[str]|None=None
+    theme:Literal["dark","dim"]|None=None
+    notifications:bool|None=None
+    ai_provider:Literal["chatgpt","gemini","openai","compatible","ollama"]|None=None
+
+@tool("system.open","Navigate to an application screen; uploads and credentials use secure GUI forms.",Page)
+def open_page(a):return {"navigate":a.page,"open_page":True,"message":"Opening "+a.page+"."}
+
+@tool("settings.update","Review changes to interests, appearance, notifications or AI provider. Never accepts secrets.",SafeSettings,Permission.EXTERNAL_ACTION)
+def update_settings(a):
+    values=a.model_dump(exclude_none=True)
+    if not values:raise ValueError("Choose at least one setting to change.")
+    prefs.save(values)
+    return {"message":"Settings updated.","settings":values}
+
+@tool("content.weeklyPlan","Generate and save a seven-day plan using the same AI Planner service.",PlanInput,Permission.DRAFT)
+async def plan_week(a):
+    from .planner import weekly_plan
+    return await weekly_plan(a.platform,a.timezone,a.goal)
+
+@tool("social.import","Import supplied social URL/text into the same local Feed. No API fetch or publishing.",ImportPost,Permission.DRAFT)
+def import_post(a):return social.manual_import(a.platform,a.text,a.url,a.author)
+
+@tool("content.edit","Save the user's exact edited draft text; this clears previous approval.",EditDraft,Permission.DRAFT)
+def edit(a):
+    d=ws.get_draft(a.draft_id)
+    return ws.save_draft(d["kind"],a.text,d["feed_id"],draft_id=d["id"],platform=d["platform"])
+
+@tool("content.skip","Skip a draft in the shared inbox without publishing.",DraftID,Permission.DRAFT)
+def skip(a):
+    from .workspace_routes import skip as skip_draft
+    return skip_draft(a.draft_id)
+
+@tool("content.manual","Prepare the exact draft for an explicitly confirmed manual composer handoff.",DraftID,Permission.EXTERNAL_ACTION)
+def manual(a):
+    ws.approve(a.draft_id)
+    result=content.manual(a.draft_id)
+    return {**result,"open_url":result["url"],"message":result["note"]}
+
+@tool("scheduler.list","Show scheduled items and statuses from the same calendar.")
+def schedules(_):return db.rows("SELECT * FROM scheduled_posts ORDER BY due_at DESC LIMIT 100")
+
+@tool("history.list","Show the latest real activity including failures and confirmed post IDs.")
+def history(_):return db.rows("SELECT * FROM activity ORDER BY id DESC LIMIT 30")
+
+@tool("analytics.show","Show local activity analytics; never invent social impressions.")
+def analytics(_):return content.analytics()
+
+@tool("ideas.list","Read saved content ideas.")
+def ideas_list(_):return content.ideas()
+
+@tool("ideas.save","Save a content idea to the local Ideas vault.",IdeaInput,Permission.DRAFT)
+def ideas_save(a):return content.add_idea(a.model_dump())
+
+@tool("ideas.delete","Delete one saved idea.",NumericID,Permission.DESTRUCTIVE)
+def ideas_delete(a):return content.delete_idea(a.id)
+
+@tool("media.list","List local media metadata. To upload a file, open the Media screen.")
+def media_list(_):return db.rows("SELECT id,name,mime,size,width,height FROM media ORDER BY created_at DESC LIMIT 100")

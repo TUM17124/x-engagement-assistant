@@ -62,7 +62,7 @@ def dashboard():
     generated=db.one("SELECT COUNT(*) n FROM drafts WHERE generated_text<>''")["n"]
     accepted=db.one("SELECT COUNT(DISTINCT a.draft_id) n FROM activity a JOIN drafts d ON a.draft_id=d.id WHERE a.action='approved' AND d.generated_text<>''")["n"]
     return {"profile":db.get_setting("x_profile"),"x_connected":bool(load_tokens()),
-        "x_health":db.get_setting("x_health"),"ai_health":db.get_setting("ai_health"),"provider":prefs.get("ai_provider"),"model":prefs.get("ai_model"),
+        "x_health":db.get_setting("x_health"),"ai_health":db.get_setting("ai_health"),"provider":prefs.get("ai_provider"),"model":prefs.get("chatgpt_model") if prefs.get("ai_provider")=="chatgpt" else prefs.get("ai_model"),
         "scheduler":db.get_setting("scheduler_state","Stopped"),"today_writes":action_count_today(),
         "drafts":counts,"published":published,"approved":approved,"generated":generated,
         "acceptance_rate":round(accepted/generated*100,1) if generated else None,

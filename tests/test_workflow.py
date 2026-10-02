@@ -133,7 +133,7 @@ class WorkflowTests(AppTest):
     def test_failed_reply_retains_text_and_never_retries(self):
         f=self.source();d=self.draft("reply","My final edited reply",f["id"]);ws.approve(d["id"])
         with patch.object(x_api,"create_reply",new_callable=AsyncMock,side_effect=ServiceError("X",403)) as send:
-            self.assertEqual(self.post(f"/api/drafts/{d['id']}/publish").status_code,400)
+            self.assertEqual(self.post(f"/api/drafts/{d['id']}/publish").status_code,502)
             send.assert_awaited_once()
         self.assertEqual(ws.get_draft(d["id"])["text"],d["text"])
         self.assertEqual(storage.action_count_today(),0)

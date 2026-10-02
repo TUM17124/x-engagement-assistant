@@ -148,12 +148,15 @@ async def suggest(data:dict):
     text=str(data.get("text",""))[:12000]
     context={"my_profile":prefs.get("my_profile"),"brand_voice":prefs.get("brand_voice"),"product":prefs.get("product")}
     if task=="Weekly plan":
-        evidence={"trends":social.trends()[:5],"ideas":db.rows("SELECT title,text FROM ideas ORDER BY id DESC LIMIT 8"),
-          "recent":db.rows("SELECT platform,final_text FROM activity WHERE status='published' ORDER BY id DESC LIMIT 12")}
-        text=json.dumps(evidence)
+        from ..planner import weekly_plan
+        return await weekly_plan(platform,str(data.get("timezone","UTC")),text)
     result=await ws.ai_call(lambda:ai_provider().rewrite(text,task+" for "+CATALOG[platform]["name"]+
         ". Create original, useful content; never copy a creator's wording or invent metrics. Suggestions only. Respect the target's "+str(CATALOG[platform]["limit"])+" character limit. Truthful context: "+json.dumps(context)))
     return {"text":result,"quality":social.quality(result,text)}
+
+@router.get("/planner")
+def saved_plan():
+    return db.get_setting("last_weekly_plan",{})
 
 @router.get("/ideas")
 def ideas():return db.rows("SELECT * FROM ideas ORDER BY id DESC")

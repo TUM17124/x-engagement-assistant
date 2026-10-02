@@ -47,6 +47,19 @@ templates = Jinja2Templates(directory=str(resources() / "templates"))
 app.mount("/static", StaticFiles(directory=str(resources() / "static")), name="static")
 app.include_router(settings_router)
 
+from .chatgpt_auth import ChatGPTError
+
+@app.exception_handler(ChatGPTError)
+async def chatgpt_error(request, error):
+    return JSONResponse({"error":str(error), "technical":f"ChatGPT HTTP {error.status}" if error.status else "ChatGPT: "+error.state,
+        "hint":"Open Settings > AI Provider > ChatGPT Plan to check the account, plan permission and available models. API-key billing is a separate provider."},status_code=502)
+
+@app.exception_handler(Exception)
+async def unexpected_error(request, error):
+    return JSONResponse({"error":"The app encountered an unexpected problem while completing this action.",
+        "hint":"Your saved data is retained. Reopen the app and check History before repeating a publishing action.",
+        "technical":"App HTTP 500"},status_code=500)
+
 @app.exception_handler(RuntimeError)
 async def runtime_error(request, error):
     return JSONResponse({"error": "The action could not be completed. Check your connection and settings."}, status_code=400)

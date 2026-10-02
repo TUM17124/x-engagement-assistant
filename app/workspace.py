@@ -261,6 +261,7 @@ async def publish(draft_id, scheduled=False):
             db.execute("UPDATE drafts SET status=? WHERE id=?",(state,draft_id))
             message = str(error) if isinstance(error,(ServiceError,ValueError)) else "Publishing could not be confirmed. Check X before trying again."
             activity(draft["kind"],draft,status=state,channel="API",error=message)
+            if isinstance(error,ServiceError):raise
             raise ValueError(message) from None
         db.execute("UPDATE drafts SET status='published' WHERE id=?",(draft_id,))
         db.execute("UPDATE scheduled_posts SET status='published' WHERE draft_id=?",(draft_id,))

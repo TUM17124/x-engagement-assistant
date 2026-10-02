@@ -822,16 +822,12 @@ function listenerPage() {
     '<button type="submit">Save Assistant Mode</button><p class="hint">This is an opt-in paid-usage boundary. At most two local items are analyzed per pass, subject to the global AI limit. Account APIs and watchlists obey polling intervals. X paid search retains its own daily cap.</p></form>'
   );
 }
-function plannerPage() {
-  return (
-    heading(
-      "AI Planner",
-      "A suggested weekly rhythm, never an automatic posting campaign.",
-    ) +
-    '<div class="card"><p>Uses your tracked interests, observed trends, saved ideas, profile and recent local publishing history.</p>' +
-    msButton("Suggest a weekly plan", "weekly-plan", "", "") +
-    '<div id="weekly-plan"></div></div>'
-  );
+async function plannerPage() {
+  const saved=await api('/api/social/planner');
+  return heading('AI Planner','A seven-day plan for your interests. Suggestions stay local until you review them.')+
+    '<div class="card"><p>Uses tracked interests, saved ideas, your profile and available local history. No paid X search is required.</p>'+select('Platform','planner_platform',saved.platform||'x',Object.entries(platformLabels))+area('Goal for this week (optional)','planner_goal','','placeholder="Example: introduce my app and share useful PDF workflows"')+
+    '<p>AI provider: <strong>'+esc(config.ai_provider==='chatgpt'?'ChatGPT Plan':config.ai_provider)+'</strong></p>'+msButton('Suggest a weekly plan','weekly-plan','','')+
+    '<div id="weekly-plan">'+(saved.text?'<p class="hint">Last generated '+esc(fmt(saved.generated_at))+' ? '+esc(saved.model)+'</p>'+suggestionOutput(saved.text):'<p class="hint">Your generated plan will be saved locally here. Nothing is scheduled automatically.</p>')+'</div></div>';
 }
 
 function safeRemoteImage(value) {
