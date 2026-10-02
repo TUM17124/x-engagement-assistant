@@ -31,6 +31,8 @@ class CompatibleImageProvider(ImageProvider):
         return media.add(data,"generated.png")
 
 async def describe(id,instruction):
+    if prefs.get("ai_provider")=="chatgpt":
+        raise ValueError("The ChatGPT plan adapter currently supports text. Select a vision-capable Gemini, OpenAI, compatible, or Ollama model for image assistance.")
     row=__import__("app.database",fromlist=["one"]).one("SELECT * FROM media WHERE id=?",(id,))
     if not row or not row["mime"].startswith("image/"):raise ValueError("Choose an image for visual assistance.")
     with Image.open(media.media_path(id)) as source:

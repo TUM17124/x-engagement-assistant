@@ -5,6 +5,7 @@ import hashlib
 import json
 import secrets
 import time
+import threading
 import uuid
 import webbrowser
 from urllib.parse import urlencode, urlsplit, parse_qs
@@ -33,6 +34,8 @@ class ChatGPTAuthService:
         self.pending = None
         self.timer = None
         self.refreshing = False
+        self.phase = ""
+        self.login_error = ""
 
     def _load(self):
         return json.loads(store.get("chatgpt_connections") or '{"active":"","profiles":{}}')
@@ -77,7 +80,7 @@ class ChatGPTAuthService:
             "profiles": [{"id": key, "name": p.get("name", ""), "email": p.get("email", ""),
                           "connected": bool(p.get("access_token"))}
                          for key, p in data["profiles"].items()],
-            "signing_in": bool(self.pending), "manage_usage_url": USAGE_URL}
+            "signing_in": bool(self.pending), "login_phase": self.phase, "login_error": self.login_error, "manage_usage_url": USAGE_URL}
 
     def get_profile(self):
         return self.get_connection_status()["profile"]
@@ -120,7 +123,15 @@ class ChatGPTAuthService:
             if profile_id and profile_id not in data["profiles"]:
                 raise ValueError("Choose a saved ChatGPT account.")
             profile = data["profiles"].get(key, {})
-            config = await self._discovery()
+            self.phase = "Contacting OpenAI"
+            self.login_error = ""
+            try:
+                async with asyncio.timeout(30):
+                    config = await self._discovery()
+            except (TimeoutError,httpx.HTTPError,ChatGPTError):
+                self.phase = ""
+                self.login_error = "OpenAI sign-in could not be reached. Retry when your connection is available."
+                raise ChatGPTError(self.login_error) from None
             self.server = await asyncio.start_server(self._callback_connection, "127.0.0.1", 0, limit=16384)
             port = self.server.sockets[0].getsockname()[1]
             verifier = secrets.token_urlsafe(64)
@@ -139,15 +150,24 @@ class ChatGPTAuthService:
                 if profile.get("id_token"): query["id_token_hint"] = profile["id_token"]
                 if profile.get("email"): query["login_hint"] = profile["email"]
             if enable_plan: query["prompt"] = "consent"
-            # Only the backend opens this URL, which can contain a retained ID token hint.
-            try:
-                opened = await asyncio.to_thread(webbrowser.open, config["authorization_endpoint"]+"?"+urlencode(query))
-                if not opened: raise ValueError("The default browser could not be opened. Set a default browser and reconnect.")
-            except Exception:
-                await self.close_listener()
-                raise
+            # OS browser activation can block. Do not hold the OAuth lock or UI request
+            # while Windows opens it, and do not put a blocked OS call in asyncio's exit pool.
+            self.phase = "Waiting for browser authorization"
             self.timer = asyncio.create_task(self._expire())
+            loop = asyncio.get_running_loop()
+            url = config["authorization_endpoint"]+"?"+urlencode(query)
+            def open_browser():
+                try: opened = webbrowser.open(url)
+                except Exception: opened = False
+                if not opened and not loop.is_closed():
+                    loop.call_soon_threadsafe(self._browser_failed,state)
+            threading.Thread(target=open_browser,name="chatgpt-browser",daemon=True).start()
             return self.get_connection_status()
+
+    def _browser_failed(self,state):
+        if self.pending and secrets.compare_digest(self.pending["state"],state):
+            self.login_error = "The default browser could not be opened. Set a default browser and reconnect."
+            asyncio.create_task(self.close_listener())
 
     async def _expire(self):
         await asyncio.sleep(600)
@@ -155,10 +175,14 @@ class ChatGPTAuthService:
 
     async def close_listener(self):
         self.pending = None
+        self.phase = ""
         if self.server:
-            self.server.close()
-            await self.server.wait_closed()
+            server = self.server
             self.server = None
+            server.close()
+            # Python 3.13 wait_closed also waits for accepted clients. The current
+            # callback must finish its response before that wait can complete.
+            asyncio.create_task(server.wait_closed())
         if self.timer and self.timer is not asyncio.current_task():
             self.timer.cancel()
         self.timer = None

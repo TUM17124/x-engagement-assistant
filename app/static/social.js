@@ -633,7 +633,7 @@ function mediaCard(m) {
     input("Alt text", "alt_text", m.alt_text) +
     check("Favorite", "favorite", m.favorite) +
     '<button type="submit">Save details</button></form><div class="row">' +
-    msButton("AI captions / alt text", "media-assist", m.id) +
+    (config.ai_provider==="chatgpt" ? '<span class="hint">Image assistance requires a separately selected vision-capable provider.</span>' : msButton("AI captions / alt text", "media-assist", m.id)) +
     msButton("Usage history", "media-usage", m.id) +
     msButton("Reuse in Create", "media-reuse", m.id) +
     '<a class="btn" href="/api/media/' +

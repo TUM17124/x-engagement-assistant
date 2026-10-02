@@ -56,6 +56,7 @@ class ChatGPTTests(AppTest):
         async def run():
             with patch.object(auth,"_discovery",AsyncMock(return_value=CONFIG)),patch("app.chatgpt_auth.webbrowser.open",return_value=True) as browser:
                 await auth.connect(new_profile=True)
+                await asyncio.sleep(.05)
                 from urllib.parse import parse_qs,urlsplit
                 query=parse_qs(urlsplit(browser.call_args.args[0]).query)
                 self.assertEqual(query["client_id"],["dynamic_agent_client"])
@@ -67,11 +68,49 @@ class ChatGPTTests(AppTest):
                 await auth.close_listener()
                 self.credentials()
                 await auth.connect()
+                await asyncio.sleep(.05)
                 query=parse_qs(urlsplit(browser.call_args.args[0]).query)
                 self.assertEqual(query["client_id"],["oaiapp_test"])
                 self.assertNotIn("agent_name_hint",query)
                 self.assertEqual(query["id_token_hint"],["mock-id-private"])
                 await auth.close_listener()
+        asyncio.run(run())
+
+    def test_browser_launch_does_not_block_connect_or_cancellation(self):
+        import threading
+        release=threading.Event()
+        async def run():
+            def delayed(*args):
+                release.wait(2)
+                return True
+            try:
+                with patch.object(auth,"_discovery",AsyncMock(return_value=CONFIG)),patch("app.chatgpt_auth.webbrowser.open",side_effect=delayed):
+                    result=await asyncio.wait_for(auth.connect(new_profile=True),.5)
+                    self.assertTrue(result["signing_in"])
+                    await asyncio.wait_for(auth.close_listener(),.5)
+                    self.assertFalse(auth.get_connection_status()["signing_in"])
+            finally:release.set()
+        asyncio.run(run())
+
+    def test_real_loopback_callback_completes_without_waiting_on_itself(self):
+        async def run():
+            from urllib.parse import urlsplit,urlencode
+            with patch.object(auth,"_discovery",AsyncMock(return_value=CONFIG)),patch("app.chatgpt_auth.webbrowser.open",return_value=True):
+                await auth.connect(new_profile=True)
+                pending=dict(auth.pending)
+                port=urlsplit(pending["redirect"]).port
+                with patch.object(auth,"_token_request",AsyncMock(return_value={"access_token":"socket-access","refresh_token":"socket-refresh",
+                    "token_type":"Bearer","expires_in":3600,"id_token":"verified-test-token","scope":"openid chatgpt.tokens.use.direct"})),patch.object(auth,"_verify_identity",AsyncMock(return_value={"sub":"socket-user"})):
+                    reader,writer=await asyncio.open_connection("127.0.0.1",port)
+                    target="/auth/chatgpt/callback?"+urlencode({"state":pending["state"],"code":"socket-code","client_id":"oaiapp_socket"})
+                    writer.write(("GET "+target+" HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n").encode())
+                    await writer.drain()
+                    response=await asyncio.wait_for(reader.read(),2)
+                    self.assertIn(b"ChatGPT connected",response)
+                    writer.close();await writer.wait_closed()
+                self.assertTrue(auth.has_plan_usage_permission())
+                self.assertIsNone(auth.pending)
+                self.assertIsNone(auth.server)
         asyncio.run(run())
 
     def test_identity_signature_audience_nonce_and_issuer(self):
@@ -165,6 +204,13 @@ class ChatGPTTests(AppTest):
             self.assertEqual(auth.get_connection_status()["state"],"Usage limit reached")
             with self.assertRaises(ChatGPTError):await auth.get_access_token_for_internal_use()
         asyncio.run(run())
+
+    def test_chatgpt_image_assistance_is_explicitly_unavailable_without_paid_fallback(self):
+        prefs.save({"ai_provider":"chatgpt"})
+        from app.image_providers import describe
+        with self.assertRaisesRegex(ValueError,"currently supports text"):
+            asyncio.run(describe("any-image","describe it"))
+        self.network.assert_not_called()
 
     def test_model_catalog_and_no_automatic_api_key_fallback(self):
         self.credentials()
