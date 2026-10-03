@@ -147,3 +147,11 @@ class UpdateTests(AppTest):
         assets["Social-Engagement-Command-Center-arm64.dmg"]="https://evil.test/app.dmg"
         downloads={d["id"]:d for d in updates.installer_downloads(assets,base)}
         self.assertFalse(downloads["macos-arm64"]["available"])
+
+    def test_legacy_cache_refetches_missing_download_catalog(self):
+        db.set_setting("release_status",{"version":"9.0.0","etag":"old-cache","attempted_at":0})
+        self.network.side_effect=None
+        self.network.return_value=self.response(200,release(),{"etag":"updated-cache"})
+        result=self.post("/api/updates/check").json()
+        self.assertNotIn("if-none-match",self.network.call_args.args[0].headers)
+        self.assertTrue(result["release"]["downloads"])

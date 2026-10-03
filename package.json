@@ -1,6 +1,6 @@
 {
   "name": "x-engagement-assistant",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "private": true,
   "description": "Local provider-neutral AI engagement workspace with approval-first social tools",
   "scripts": {

@@ -55,3 +55,9 @@ Ordinary CI creates unsigned test installers using tauri.ci.conf.json and never 
 ## Signing distinction
 
 Tauri's updater signature authenticates the downloaded artifact and its version. It is separate from a Windows Authenticode publisher certificate. This project does not yet have an Authenticode certificate, so Windows may show an unknown-publisher warning on first installation.
+
+## Backend shutdown repair (0.3.4)
+
+The updater must wait for process exit, not just HTTP shutdown. On Windows the packaged backend includes a PyInstaller launcher and Python child. If graceful shutdown exceeds 15 seconds, the app stops only the process tree it launched, waits for the termination event, and checks that the backend executable can be opened exclusively before installing. A remaining file lock aborts installation with an explanation. Normal Quit uses the same cleanup. No global process-name kill or public terminal shell command is introduced.
+
+Old versions do not gain the new shutdown behavior until the new native executable is installed. If an older updater leaves the app closed or incompletely updated, close its remaining backend before re-running the verified installer. Keep the private application-data directory; uninstalling/deleting user data is not necessary.

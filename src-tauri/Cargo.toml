@@ -1,6 +1,6 @@
 [package]
 name = "x-engagement-assistant"
-version = "0.3.3"
+version = "0.3.4"
 description = "An approval-first X engagement workspace"
 authors = ["TUM17124"]
 license = "MIT"

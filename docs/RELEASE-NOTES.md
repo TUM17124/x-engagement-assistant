@@ -1,6 +1,12 @@
-# Social Engagement Command Center 0.3.3
+# Social Engagement Command Center 0.3.4
 
 A local, open-source social engagement workspace. AI prepares content; you approve public actions.
+
+## Update repair
+
+The live 0.3.1-to-0.3.3 update exposed an orphaned PyInstaller child holding the backend executable open. The launcher could be replaced while the backend stayed old. The native app now waits for actual process exit, stops only its owned process tree if graceful shutdown times out, and refuses installation while the backend file remains locked. Quit uses the same cleanup. Old cached release metadata is refreshed to load the platform download catalog.
+
+Users on older builds who encounter this issue should quit the app and use the verified Windows installer. This shutdown repair takes effect once 0.3.4 is installed.
 
 ## What changed
 
@@ -17,7 +23,7 @@ Existing X OAuth, paid X search, free web-search fallback, manual imports, appro
 
 ## Windows update
 
-Use Settings > Updates > Check for updates, then approve Update to 0.3.3. The desktop updater downloads and verifies the signed installer, backs up your local database, installs and restarts. Save unfinished edits first. Accounts and drafts remain in the application-data directory.
+Use Settings > Updates > Check for updates, then approve Update to 0.3.4. The desktop updater downloads and verifies the signed installer, backs up your local database, installs and restarts. Save unfinished edits first. Accounts and drafts remain in the application-data directory.
 
 [Download Windows installer](https://github.com/TUM17124/x-engagement-assistant/releases/latest/download/Social-Engagement-Command-Center-Setup.exe)
 

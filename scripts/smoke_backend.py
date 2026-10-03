@@ -10,6 +10,9 @@ import socket
 import secrets
 import httpx
 
+sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
+from app.paths import VERSION
+
 binary=Path(sys.argv[1]).resolve()
 with socket.socket() as listener:
     listener.bind(("127.0.0.1",0))
@@ -32,6 +35,7 @@ with tempfile.TemporaryDirectory() as folder:
                     pass
                 time.sleep(1)
             else:raise RuntimeError("Packaged backend did not start.")
+            assert client.get("/health").json()["version"]==VERSION, "Bundled backend version does not match source"
             root=client.get("/")
             assert root.status_code==200 and "Multi-Social AI Engagement Command Center" in root.text
             boot=client.get("/api/bootstrap").json()

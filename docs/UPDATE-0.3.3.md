@@ -55,3 +55,11 @@ A private backup of the existing workspace and comparison fingerprints were save
 - `docs/UPDATE-0.3.3.md`
 - `scripts/check_terminal_interactive.cjs`
 - `tests/test_terminal_interactive.py`
+
+## Actual installed-app result (October 4, 2026)
+
+The signed 0.3.1-to-0.3.3 download completed, but the old native shutdown code killed the PyInstaller launcher before its Python child exited. The installer replaced the desktop executable while the still-running backend prevented replacement of its file. Automatic restart did not succeed. This is a failed direct-update test, not a successful one.
+
+Recovery stopped only the verified orphan owned by this installation, re-ran the signature-verified 0.3.3 installer (exit 0), and launched the installed app. `/health` reported 0.3.3. Dashboard, interactive terminal assets/context, AI provider catalog, video settings and Trend Radar returned HTTP 200. Hash comparisons against the private pre-update SQLite backup confirmed drafts, actions, schedules, social-account metadata, My Profile, Writing Voice, My Product and Brand Voice were unchanged. No real social action was sent.
+
+The process-lifecycle repair is tracked in version 0.3.4. Published 0.3.3 artifacts are not replaced.

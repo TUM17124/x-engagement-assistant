@@ -6,8 +6,9 @@ use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_notification::NotificationExt;
 
 mod updates;
+mod backend_lifecycle;
 
-struct Backend { child: Mutex<Option<CommandChild>>, token: String, tray_enabled: Arc<AtomicBool> }
+struct Backend { child: Mutex<Option<CommandChild>>, token: String, exited: Arc<AtomicBool>, tray_enabled: Arc<AtomicBool> }
 fn client() -> reqwest::blocking::Client {
     reqwest::blocking::Client::builder().timeout(Duration::from_secs(3)).build().expect("HTTP client")
 }
@@ -26,8 +27,16 @@ fn main() {
             let (mut events, child)=app.shell().sidecar("xea-backend")?
                 .env("XEA_DESKTOP_TOKEN",&token).args(["--port","8787"]).spawn()?;
             // Drain sidecar output; never forward it to web content or write credentials to logs.
-            tauri::async_runtime::spawn(async move { while events.recv().await.is_some() {} });
-            app.manage(Backend{child:Mutex::new(Some(child)),token:token.clone(),tray_enabled:tray_enabled.clone()});
+            let exited=Arc::new(AtomicBool::new(false));
+            let exit_signal=exited.clone();
+            tauri::async_runtime::spawn(async move {
+                while let Some(event)=events.recv().await {
+                    if matches!(event, tauri_plugin_shell::process::CommandEvent::Terminated(_)) {
+                        exit_signal.store(true,Ordering::SeqCst);
+                    }
+                }
+            });
+            app.manage(Backend{child:Mutex::new(Some(child)),exited,token:token.clone(),tray_enabled:tray_enabled.clone()});
             let handle=app.handle().clone();
             let nav_handle=handle.clone();
             WebviewWindowBuilder::new(app,"main",WebviewUrl::App("index.html".into()))
@@ -146,9 +155,7 @@ fn main() {
         if let RunEvent::Exit=event {
             let state=handle.state::<Backend>();
             let _=client().post("http://127.0.0.1:8787/desktop/shutdown").header("X-Desktop-Token",&state.token).send();
-            std::thread::sleep(Duration::from_millis(700));
-            let child = state.child.lock().unwrap().take();
-            if let Some(child) = child { let _ = child.kill(); }
+            let _=backend_lifecycle::stop(handle);
         }
     });
 }

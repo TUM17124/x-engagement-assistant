@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::UpdaterExt;
 use serde_json::{Value, json};
-use crate::{Backend, client};
+use crate::client;
 
 fn progress(token: &str, id: &str, state: &str, message: &str, downloaded: usize, total: Option<u64>) {
     let _ = client().post("http://127.0.0.1:8787/desktop/update-progress")
@@ -61,7 +61,7 @@ pub fn run(app: AppHandle, token: String, job: Value) {
         if client().get("http://127.0.0.1:8787/health").send().is_ok() {
             return Err("The workspace is still shutting down. Reopen the app before trying the update again.".into());
         }
-        if let Some(child)=app.state::<Backend>().child.lock().unwrap().take() { let _=child.kill(); }
+        crate::backend_lifecycle::stop(&app)?;
         update.install(&bytes).map_err(|_| "The system could not start the installer. Reopen the app or download the release from GitHub.")?;
         #[cfg(not(target_os = "windows"))]
         app.restart();

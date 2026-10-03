@@ -27,7 +27,7 @@ The backend output is src-tauri/binaries/xea-backend-x86_64-pc-windows-msvc.exe.
 
 The installer output is:
 
-    src-tauri/target/release/bundle/nsis/Social Engagement Command Center_0.3.3_x64-setup.exe
+    src-tauri/target/release/bundle/nsis/Social Engagement Command Center_0.3.4_x64-setup.exe
 
 Verify the sidecar with isolated data and no external API calls:
 
@@ -81,3 +81,11 @@ See [Updates and release process](UPDATES.md).
 ## macOS and Linux
 
 Native macOS (Apple Silicon and Intel) DMG and Linux DEB/AppImage builds are described in [DESKTOP-PLATFORMS.md](DESKTOP-PLATFORMS.md). The repository includes separate native CI runners, Python sidecars, platform icons and secure-keychain smoke tests. Do not distribute a cross-platform artifact until its native build and runtime checks pass.
+
+To check native Windows process cleanup, first close other app instances, then run:
+
+```powershell
+.venv\Scripts\python.exe -B scripts/smoke_desktop_lifecycle.py src-tauri/target/release/x-engagement-assistant.exe
+```
+
+This uses a disposable workspace and verifies two startup/close cycles without real social or AI calls.

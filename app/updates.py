@@ -102,7 +102,7 @@ async def check_release(force=False):
         cache.update(attempted_at=now)
         db.set_setting("release_status", cache)
         headers = {"Accept":"application/vnd.github+json", "User-Agent":"Social-Engagement-Command-Center/"+VERSION}
-        if cache.get("etag"):
+        if cache.get("etag") and isinstance(cache.get("downloads"), list):
             headers["If-None-Match"] = cache["etag"]
         try:
             async with httpx.AsyncClient(timeout=20, follow_redirects=False) as client:
