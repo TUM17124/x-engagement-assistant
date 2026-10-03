@@ -1,5 +1,5 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert'),path=require('path');
-const files=['app','settings','feed','screens','actions','accounts','social','social-actions','terminal','updates','ai-providers','forms'];
+const files=['app','settings','feed','screens','actions','accounts','social','social-actions','terminal','terminal-interactive','updates','ai-providers','forms'];
 for(const file of files)new vm.Script(fs.readFileSync(path.join('app/static',file+'.js'),'utf8'),{filename:file+'.js'});
 const context={console,URLSearchParams,FormData,Date,setTimeout,clearTimeout,
 document:{addEventListener(){},querySelector(){return null}},window:{addEventListener(){}},location:{hash:''}};
@@ -15,6 +15,8 @@ if(!updatesPage().includes('newer than the latest published'))throw Error('Local
 if(!updatesPage().includes('does not update the installed app'))throw Error('Published release scope missing');
 aiCatalog=[{id:'gemini',name:'Google Gemini',category:'Cloud'},{id:'openrouter',name:'OpenRouter',category:'Gateway'}];
 if(!providerSettingsPage().includes('Set up API key')||!providerSettingsPage().includes('Connect OpenRouter'))throw Error('Provider authorization labels missing');
+if(!platformDownloads({downloads:[{name:'Windows',available:true,url:'https://github.com/test/setup.exe'},{name:'macOS',available:false}]}).includes('Installer not published'))throw Error('Missing platform availability');
+if(!platformDownloads({}).includes('Authenticode')||!platformDownloads({}).includes('Gatekeeper'))throw Error('Installation warning help missing');
 settingsTab='x';
 config={ai_provider:'gemini',ai_model:'test-model',interests:[],theme:'dark',default_query:'PDF',discovery_mode:'automatic',daily_search_limit:20};
 if(!settingsPage({authors:[],topics:[]}).includes('Discovery Mode'))throw Error('Discovery Mode missing');

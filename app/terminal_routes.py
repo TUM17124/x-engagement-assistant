@@ -18,10 +18,15 @@ QUEUES={}
 class Command(BaseModel):
     model_config=ConfigDict(extra="forbid")
     id:str=Field(default_factory=lambda:str(uuid.uuid4()))
-    text:str=Field(min_length=1,max_length=4000)
+    text:str=Field(min_length=1,max_length=64000)
     timezone:str="UTC"
     approval_id:str|None=None
     approval_checksum:str|None=Field(default=None,min_length=64,max_length=64)
+
+@router.get("/context")
+def terminal_context():
+    from .terminal_context import hints
+    return hints()
 
 @router.get("/tools")
 def tools():return catalog()
@@ -64,6 +69,9 @@ async def run_command(data,queue):
                 result=await bus.execute_plan(plan,data.id,emit)
             from .terminal_feedback import completion_report
             result["report"]=completion_report(result)
+            if not result.get("approvalIds") and not result.get("choices"):
+                from .terminal_context import followups
+                result["question"],result["choices"]=followups(result)
             db.execute("UPDATE terminal_commands SET status='completed',finished_at=?,result=? WHERE id=?",(db.now(),json.dumps(bus.redact(result)),data.id))
             emit({"type":"result",**result})
     except asyncio.CancelledError:

@@ -1,29 +1,24 @@
-# Social Engagement Command Center 0.3.1
+# Social Engagement Command Center 0.3.3
 
-A local, open-source AI engagement workspace. Discover relevant conversations, prepare thoughtful replies and content, and review every public action.
+A local, open-source social engagement workspace. AI prepares content; you approve public actions.
 
-## Install on Windows
+## What changed
 
-[Download the Windows installer](https://github.com/TUM17124/x-engagement-assistant/releases/latest/download/Social-Engagement-Command-Center-Setup.exe)
+- Provider-neutral AI settings with official signup/setup links, secure keys, model discovery and clear distinctions between API keys, local models and supported browser authorization. Includes OpenRouter PKCE and preserves existing ChatGPT connections. Other providers do not gain consumer-subscription sign-in merely by appearing in the catalog.
+- Support for Claude, Cohere, DeepSeek, Gemini, Groq, Kimi, LM Studio, Mistral, Ollama, OpenAI, OpenRouter, Together, xAI and custom compatible APIs. Local-only mode, optional fallback, context controls and per-feature models.
+- Expanded Trend Radar using Mastodon, DEV/Forem, PeerTube and Hacker News public APIs, with interest filters, opt-in media previews and AI drafts awaiting review.
+- Separate Video Generation settings for Gemini Veo and xAI, secure credentials, explicit paid-job approval, persistent jobs and local MP4 downloads.
+- Profile/settings save receipts and terminal feedback improvements.
+- Integrated editable multiline AI Terminal: Enter sends, Shift+Enter inserts a line, Ctrl+C stops. Numbered approval/follow-up choices, rotating local-context tips, real Radar scans/reports, reviewable interest changes, limits and video setup guidance. The terminal still uses registered tools; it has no unrestricted OS or arbitrary web access.
+- Update screen explains the installed version versus published releases. Local source edits are not automatically installed. This release has a new version so installed 0.3.1 applications can discover it.
+- macOS/Linux build configurations and native CI; those installers are not included in this Windows release and still require native verification.
 
-Run the installer, launch the app, and complete onboarding. No Python, Git, Node.js, terminal, or .env editing is needed.
+Existing X OAuth, paid X search, free web-search fallback, manual imports, approvals, scheduling and history remain available. No real social posts or paid video jobs were sent during testing. Provider adapters are mock-tested; API access and credits still depend on your own account. Live PeerTube/Hacker News reads passed; Mastodon/DEV live reads could not be verified in the build environment.
 
-## New in this release
+## Windows update
 
-- Fixed My Profile saving: dedicated validated profile API, optional fields, persistence and a clear ?Profile saved? result.
-- Broader typed terminal controls for settings, safety limits, profile, drafts, topics, watchlists, media and approvals. Destructive changes require confirmation.
-- Grok, Claude, Kimi and DeepSeek official API provider options with secure per-provider keys. Consumer subscription sign-in is not implied.
-- Updates button and Settings > Updates & Email.
-- Published GitHub release checks with download progress and explicit install approval.
-- Tauri-signed updater artifacts with version-bound signatures, plus a private database backup before updating.
-- Free release-email signup through Blogtrottr: no API key, sender setup or GitHub account. The provider asks for your email and verification; its free plan contains ads.
-- Persistent AI Terminal work status, completion reports, next-step links and exact yes/no approvals.
-- Dedicated weekly AI Planner and clearer connection, quota, validation and network errors.
+Use Settings > Updates > Check for updates, then approve Update to 0.3.3. The desktop updater downloads and verifies the signed installer, backs up your local database, installs and restarts. Save unfinished edits first. Accounts and drafts remain in the application-data directory.
 
-Existing X OAuth, paid X search and free web fallback, manual imports, AI providers, approval workflows, scheduling, media, history and local analytics remain available.
+[Download Windows installer](https://github.com/TUM17124/x-engagement-assistant/releases/latest/download/Social-Engagement-Command-Center-Setup.exe)
 
-The Windows executable does not yet have a commercial Authenticode certificate; Windows may show an unknown-publisher warning. Updater signatures verify our release artifacts and are separate from Windows publisher reputation.
-
-AI and social API eligibility, quotas and charges remain separate. No social actions are sent during update checks. Installing closes the app briefly; scheduling requires the app to be running.
-
-[Source code and documentation](https://github.com/TUM17124/x-engagement-assistant)
+End users do not need Python, Node, Git or .env editing. Updater signatures are separate from Windows Authenticode; the installer may display an unknown-publisher warning. No update can guarantee success through network, disk or permission failures; errors remain visible and a verified installer download is available as a fallback.

@@ -6,7 +6,7 @@ const ctx={console,FormData,URLSearchParams,URL,AbortController,TypeError,TextDe
  document:{addEventListener(k,v){(listeners[k]??=[]).push(v)},querySelector(s){return s==='#page-error'?nodes.findLast(n=>n.id==='page-error'&&!n.removed)||null:root},createElement:element},
  window:{addEventListener(){}},location:{hash:''},fetch:async()=>({ok:true,status:200,json:async()=>({ok:true})})};
 vm.createContext(ctx);
-for(const f of ['app','actions','terminal'])vm.runInContext(fs.readFileSync('app/static/'+f+'.js','utf8'),ctx);
+for(const f of ['app','actions','terminal','terminal-interactive'])vm.runInContext(fs.readFileSync('app/static/'+f+'.js','utf8'),ctx);
 vm.runInContext(fs.readFileSync('app/static/forms.js','utf8').replace('start().catch(errorPanel);',''),ctx);
 (async()=>{
  for(const status of [401,402,403,404,413,422,429,500,502]){

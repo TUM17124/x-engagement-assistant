@@ -556,7 +556,7 @@ def reject_action(a):
 
 
 class SettingSection(Args):
-    section:Literal["accounts","memory","brand","usage","x","ai","voice","product","appearance","safety","data","updates"]
+    section:Literal["accounts","memory","brand","usage","x","ai","voice","product","appearance","safety","data","updates","video","image"]
 @tool("settings.open","Open a named Settings section, including secure credential forms.",SettingSection)
 def settings_open(a):return {"navigate":"settings","settings_tab":a.section,"open_page":True,"message":"Opening Settings > "+a.section+"."}
 @tool("settings.readContext","Read current writing voice, brand voice and product fields.")
@@ -660,3 +660,59 @@ async def draft_from_trend(a):
 def video_jobs(_):
     from .video_providers import jobs
     return jobs()
+
+
+@tool("system.context","Read current Radar, video setup, local limits and waiting draft counts. No network calls or secrets.")
+def app_context(_):
+    from .terminal_context import state
+    return state()
+
+@tool("trends.report","Create a grounded AI report from cached Radar evidence and user interests. Does not browse, invent metrics or publish.",permission=Permission.DRAFT,rate_limit=12)
+async def report_trends(_):
+    from .terminal_context import radar_report
+    return await radar_report()
+
+class RadarPatch(Args):
+    interests:str|None=Field(default=None,max_length=1000)
+    excluded:str|None=Field(default=None,max_length=1000)
+    sources:list[Literal["mastodon","dev","peertube","hackernews"]]|None=Field(default=None,max_length=4)
+    daily_refresh_limit:int|None=Field(default=None,ge=1,le=48)
+
+@tool("trends.configure","Review changes to Radar interests, excluded terms, sources or its daily refresh cap. Saves only after confirmation.",RadarPatch,Permission.EXTERNAL_ACTION)
+def configure_radar(a):
+    from .trend_radar import settings,RadarSettings,save_settings
+    values=a.model_dump(exclude_none=True)
+    if not values:raise ValueError("Choose a Radar setting to change.")
+    expected=RadarSettings(**{**settings().model_dump(),**values})
+    save_settings(expected)
+    if settings()!=expected:raise ValueError("Radar save verification failed.")
+    return {"message":"Radar settings saved and verified. Run scan trends or trend report when ready.","settings":expected.model_dump(),"verified":True}
+
+@tool("video.status","Explain video setup and how to enable it. Never reveals keys or starts a paid job.")
+def video_status(_):
+    from .terminal_context import state
+    value=state()["video"]
+    return {**value,"message":("Video provider configured. Generation may incur charges and requires an exact prompt approval." if value["configured"] else "Video generation is not configured. Open Settings > Video Generation, choose Gemini Veo or xAI, save your own API key, test the connection and select a video model. Text AI credentials do not automatically enable video."),"navigate":"settings","settings_tab":"video"}
+
+
+class TerminalVideoPrompt(Args):
+    prompt:str=Field(min_length=5,max_length=4000)
+class TerminalVideoID(Args):
+    id:str=Field(min_length=16,max_length=64,pattern=r"^[a-zA-Z0-9-]+$")
+
+@tool("video.generate","Review one potentially paid text-to-video generation. Exact prompt and provider configuration need human approval. Never publishes.",TerminalVideoPrompt,Permission.EXTERNAL_ACTION,rate_limit=10)
+async def generate_video(a):
+    import hashlib
+    from .video_providers import configuration,generate,VideoRequest
+    identity=hashlib.sha256(json.dumps({"prompt":a.prompt,"config":configuration().model_dump()},sort_keys=True).encode()).hexdigest()
+    return await generate(VideoRequest(prompt=a.prompt,request_id=identity,confirmed=True))
+
+@tool("video.checkJob","Check an existing video job via its configured official provider; never resubmits generation.",TerminalVideoID,rate_limit=60)
+async def check_video(a):
+    from .video_providers import poll
+    return await poll(a.id)
+
+@tool("video.save","Download a ready video into the local Media Library. Does not upload to social accounts.",TerminalVideoID,Permission.DRAFT,rate_limit=20)
+async def save_video(a):
+    from .video_providers import download
+    return await download(a.id)

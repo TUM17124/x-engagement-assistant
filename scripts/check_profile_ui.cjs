@@ -1,7 +1,7 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const ctx={console,URLSearchParams,FormData,URL,Date,setTimeout,clearTimeout,document:{addEventListener(){},querySelector(){return null}},window:{addEventListener(){}},location:{hash:''}};
 vm.createContext(ctx);
-for(const file of ['app','settings','feed','screens','actions','accounts','social','social-actions','terminal','updates','ai-providers','forms']){
+for(const file of ['app','settings','feed','screens','actions','accounts','social','social-actions','terminal','terminal-interactive','updates','ai-providers','forms']){
  let code=fs.readFileSync('app/static/'+file+'.js','utf8');if(file==='forms')code=code.replace('start().catch(errorPanel);','');vm.runInContext(code,ctx);
 }
 (async()=>{

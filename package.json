@@ -1,12 +1,12 @@
 {
   "name": "x-engagement-assistant",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "description": "Local provider-neutral AI engagement workspace with approval-first social tools",
   "scripts": {
     "desktop:dev": "tauri dev --no-dev-server",
     "desktop:build": "tauri build",
-    "check:ui": "node scripts/check_ui.cjs && node scripts/check_social_ui.cjs && node scripts/check_feedback.cjs && node scripts/check_profile_ui.cjs && node scripts/check_radar_video_ui.cjs"
+    "check:ui": "node scripts/check_ui.cjs && node scripts/check_social_ui.cjs && node scripts/check_feedback.cjs && node scripts/check_profile_ui.cjs && node scripts/check_radar_video_ui.cjs && node scripts/check_terminal_interactive.cjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.10.0"

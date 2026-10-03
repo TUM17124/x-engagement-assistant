@@ -14,8 +14,15 @@ REPO="TUM17124/x-engagement-assistant"
 parser=argparse.ArgumentParser()
 parser.add_argument("--publish",action="store_true",help="Make the uploaded draft release public.")
 args=parser.parse_args()
+# Public binaries must correspond to committed source and verified signed assets.
+if subprocess.check_output(["git","status","--porcelain"],cwd=ROOT,text=True).strip():
+    raise SystemExit("Commit the reviewed source before preparing a public release.")
+subprocess.run([sys.executable,"-B",str(ROOT/"scripts/package_release.py")],cwd=ROOT,check=True)
 manifest=json.loads((ROOT/"artifacts/latest.json").read_text())
 version=manifest["version"]
+config=json.loads((ROOT/"src-tauri/tauri.conf.json").read_text())
+if version!=config["version"]:
+    raise SystemExit("The update manifest does not match the source version.")
 credential=subprocess.run(["git","credential","fill"],input="protocol=https\nhost=github.com\npath="+REPO+".git\n\n",
     text=True,capture_output=True,env={**os.environ,"GIT_TERMINAL_PROMPT":"0","GCM_INTERACTIVE":"Never"},cwd=ROOT)
 if credential.returncode: raise SystemExit("GitHub credentials are unavailable. Sign in with Git Credential Manager.")
@@ -26,6 +33,8 @@ headers={"Authorization":"Bearer "+token,"Accept":"application/vnd.github+json",
 commit=subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip()
 with httpx.Client(headers=headers,timeout=120) as client:
     base="https://api.github.com/repos/"+REPO
+    if client.get(base+"/commits/"+commit).status_code!=200:
+        raise SystemExit("Push the tested source commit before publishing its installer.")
     response=client.get(base+"/releases")
     if response.status_code!=200: raise SystemExit("Could not list releases: HTTP "+str(response.status_code))
     existing=next((r for r in response.json() if r["tag_name"]=="v"+version),None)

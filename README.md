@@ -13,12 +13,14 @@ AI helps discover, summarize, rank, draft, and organize. You review, edit, and a
 Windows is the currently verified desktop target. Native macOS (Apple Silicon and Intel) DMG and Linux DEB/AppImage build workflows are included; see [platform packaging](docs/DESKTOP-PLATFORMS.md) for commands and release-signing requirements. These new native targets need runner validation before publishing. Run the NSIS installer from a tested release/build, launch **Social Engagement Command Center**, and complete onboarding. End users do not install Python, Node.js, Rust, or Git and do not edit an environment file.
 
 1. Choose your AI provider: cloud BYOK, a local model, or a custom endpoint.
-2. Authorize in your normal browser. Return to the app and choose an available model.
+2. Follow the selected provider's setup guide: save your API key, use supported browser authorization, or connect a local server. Test the connection and choose a model.
 3. Connect social accounts independently, or start with manual post import.
 4. Add interests and watched accounts.
 5. Open **AI Terminal**, enter **help**, and review drafts in Response Inbox / Approval Center.
 
 The installer has a Tauri updater signature but does not yet have a Windows Authenticode certificate; Windows may show an unknown-publisher warning. See [BUILD.md](docs/BUILD.md).
+
+[Downloads for Windows, macOS and Linux, plus installation-warning help](docs/INSTALLATION.md). The in-app Updates screen enables a platform download only when the official release actually contains its installer.
 
 ## Updates and free email alerts
 
@@ -84,7 +86,11 @@ Optional contributor `.env` values are imported once. Existing AI_BASE_URL, AI_A
 
 ## AI Terminal
 
+[Interactive terminal guide](docs/AI-TERMINAL.md).
+
 This is an application command interface, **not CMD, PowerShell, Bash, or a code-execution shell**.
+
+The prompt is an editable multiline part of the conversation. Enter sends; Shift+Enter adds a line; Ctrl+C stops an active command. Choose numbered options or type your own response. Exact action previews use 1/yes to confirm, 2/no to cancel, or 3 to describe changes. Context tips read local state without spending AI credits. `scan trends`, `trend report`, `set radar interests to AI, books`, `show limits` and `video status` use the same data and services as the GUI. Local safety-limit changes and potentially paid video generation require confirmation; platform billing and API restrictions cannot be overridden.
 
     help
     status

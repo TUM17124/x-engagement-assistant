@@ -30,7 +30,7 @@ GitHub users can instead choose **Watch > Custom > Releases**, with email enable
 
 ## Maintainer release process
 
-An update is a tested compiled release, not `git pull` into an installed app.
+An update is a tested compiled release, not `git pull` into an installed app. A locally rebuilt installer does not change an existing installation or the latest GitHub release. Every distributed change needs a new version and a published signed release. The Updates screen explicitly distinguishes equal published versions from a newer local build.
 
 The first maintainer setup generates a password-encrypted signing key outside Git:
 `%LOCALAPPDATA%\SocialCommandReleaseSigning\updater.key`.
@@ -43,6 +43,8 @@ Its password is protected by Windows DPAPI in the adjacent private vault. Only t
 5. Run scripts/package_release.py. It independently verifies the installer signature and version and creates the installer, signature, SHA256.txt and latest.json.
 6. Commit/push the tested source.
 7. Run scripts/publish_release.py to upload a draft release. Add --publish only when ready to publish the exact assets.
+
+The publishing script refuses a dirty source tree, verifies the installer signature/version again, and requires its commit to exist on GitHub before uploading the complete asset set. It cannot repair a manually published EXE-only release; create a new version instead.
 
 The publishing script uses the maintainer's existing Git Credential Manager authorization in memory and never prints credentials. It refuses to replace an already-public version. Users need no GitHub credentials for downloads.
 

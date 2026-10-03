@@ -120,6 +120,9 @@ class SocialTests(AppTest):
         item=social.manual_import("facebook","What PDF reader handles annotations well?","https://facebook.com/test","Creator")
         mock=AsyncMock(return_value='{"reply":"Great point! Keep notes next to the passage.","reason":"Specific PDF question","score":70,"topic":"PDF"}')
         with patch("app.workspace.provider") as make:
+            make.return_value.kind="gemini"
+            make.return_value.model="mock-model"
+            make.return_value.last_result=None
             make.return_value.generate_reply=mock
             draft=asyncio.run(social.analyze(item["id"]))
         self.assertEqual(draft["platform"],"facebook")

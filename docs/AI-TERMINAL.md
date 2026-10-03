@@ -99,3 +99,44 @@ A persistent Working indicator shows the active action, current step and elapsed
 Reports distinguish Completed, Waiting for approval, Stopped and Needs attention. They use actual service results rather than another AI call. New drafts explicitly say they are waiting for review in Response Inbox. Plans link to AI Planner; schedules link to Schedule; confirmed publications include post IDs and a History link. Reports suggest a next action but never execute that suggestion automatically. Network failure, missing completion and cancellation are not reported as success.
 
 The UI clears stale Terminal action previews when a new command starts. A typed confirmation consumes the selected preview; multiple previews require individual confirmation buttons.
+
+
+## Interactive conversation in 0.3.3
+
+The prompt lives inside the conversation surface. Enter sends, Shift+Enter inserts a newline, and Ctrl+C (Command+C on macOS) stops an active command while the terminal is open. With no active command, normal copy behavior remains available. Single-line history uses Up/Down only at the text boundary; multiline cursor movement remains normal. The prompt is resizable and unsent text survives app navigation. Requests above 64,000 characters are rejected with an explanation, without silently truncating the editable input.
+
+## Conversation and choices
+
+The AI may ask a question and supply numbered options; choose a button, type its number, or type another response. After a draft, the app offers a publishing preview, continued editing, or keeping it for later. Choosing a publishing preview does not publish.
+
+An exact action preview offers:
+
+1. Yes: execute that exact reviewed action.
+2. No: cancel that action.
+3. Type changes: keep the action unexecuted while you describe what to change.
+
+Only one selected preview can accept a plain yes/1. Multiple actions require their own confirmation buttons. The server verifies the request ID, checksum, current draft/account/settings and pending state. Changed or already-handled requests cannot execute again. Model suggestions cannot confirm actions. After navigating back, only a still-pending preview from the latest terminal result is restored.
+
+## Application awareness
+
+The selected AI provider receives the registered tool catalog and current non-secret metadata for local limits, Radar counts/interests, video configuration and pending drafts. Writing/conversation context follows the AI privacy settings. It does not receive API keys or social passwords. Local tips rotate while the terminal is idle; reading tips does not call AI or social APIs. AI-generated follow-up choices are based on the requested task and verified results.
+
+Commands include:
+
+- `show app state`, `accounts`, `is Facebook connected?`
+- `scan trends` to refresh configured public APIs; `show trends` to read cached sources
+- `trend report` to ask the selected AI for a grounded report on up to eight cached items
+- `set radar interests to AI, programming` to review a settings change
+- `show limits`, `set daily ai limit to 100` to review a local-cap change
+- `video status`, `settings video`
+- `generate video A peaceful forest scene` to review a potentially paid job
+- `check video <job-id>`, `save video <job-id>`
+- existing draft, profile, settings, X paid-search, watchlist, scheduling and approval commands
+
+Radar reports cite retrieved evidence and do not claim to watch videos, hear audio or know worldwide growth. Source text is untrusted data. Scans use supported public/official APIs and their cache/backoff limits. Existing paid X searches still have separate costs. There is no unrestricted browser, shell or OS-root access. Background work runs as cancellable app tasks; persistent monitoring uses the existing review-first automation engine.
+
+Limits can be reviewed and changed within existing bounds after confirmation. The app cannot increase a provider's account quota, remove its billing restrictions, turn off duplicate protection or bypass required approval. Video uses a separate configured provider/key; API-key entry stays in secure Settings. Video prompts require approval and may incur charges, and generated media is never automatically published.
+
+## Verification
+
+Mocked tests cover keyboard dispatch, multiline/history editing, numbered choices, exact approvals, stale previews, cancellation, local-state privacy, Radar configuration/reporting, source prompt injection and video generation approval. No real social post or paid video was used by these tests.

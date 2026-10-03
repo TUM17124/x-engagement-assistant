@@ -27,7 +27,7 @@ The backend output is src-tauri/binaries/xea-backend-x86_64-pc-windows-msvc.exe.
 
 The installer output is:
 
-    src-tauri/target/release/bundle/nsis/Social Engagement Command Center_0.3.1_x64-setup.exe
+    src-tauri/target/release/bundle/nsis/Social Engagement Command Center_0.3.3_x64-setup.exe
 
 Verify the sidecar with isolated data and no external API calls:
 

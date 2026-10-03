@@ -10,6 +10,7 @@ function updatesPage(){
  (r.notes?'<details><summary>Release notes</summary><p class="post-text">'+esc(r.notes)+'</p></details>':'')+
  (j.message?'<div class="notice" id="update-install-status">'+esc(j.message)+'</div>':'<div id="update-install-status"></div>')+
  '<p class="hint">Updates check published GitHub releases only. Editing this repository or building an installer does not update the installed app. A local build must be installed separately; it will not appear on GitHub until published. The installer is signature-checked and asks for your approval. The app closes during installation; saved accounts and drafts are retained. No Git, Python or terminal is needed.</p>'+
+ platformDownloads(r)+
  '<form id="update-settings-form">'+check('Check GitHub for updates while this app is running','check_updates',d.settings?.check_updates??true)+'<p class="hint">Checks run at most once every six hours. No update installs automatically.</p><button type="submit">Save update preference</button></form>'+
  '<hr class="divider"><h2>Free email updates</h2><p>Get a release email even while this app is closed. No API key, sender setup, or GitHub account is needed.</p>'+
  '<button type="button" data-update="email">Get free email updates</button>'+
@@ -66,3 +67,9 @@ document.addEventListener('click',async e=>{
   }
  });
 });
+
+function platformDownloads(release){
+ const fallback=[['windows-x64','Windows 10/11 (64-bit)'],['macos-arm64','macOS (Apple Silicon)'],['macos-x64','macOS (Intel)'],['linux-deb','Linux Ubuntu/Debian (64-bit)'],['linux-appimage','Linux AppImage (64-bit)']].map(([id,name])=>({id,name}));
+ const downloads=release.downloads||fallback;
+ return '<section class="card"><h3>Download for another computer</h3><p>Download the installer, then open it and approve installation. Your browser cannot install software silently.</p>'+downloads.map(d=>'<p><strong>'+esc(d.name)+'</strong> '+(d.available&&d.url?link('Download installer',d.url):'<span class="hint">'+(release.downloads?'Installer not published in this release':'Check for updates to see availability')+'</span>')+'</p>').join('')+'<details><summary>Why might I see an installation warning?</summary><p><strong>Windows:</strong> This project has no Windows Authenticode publisher certificate yet. SmartScreen may flag a new or unsigned download. An updater signature checks our release, but is separate from Microsoft publisher reputation.</p><p><strong>macOS:</strong> An app without Apple Developer ID signing and notarization may be blocked because Apple cannot verify the developer or check notarization. Only use the app-specific Open Anyway option if you trust the source.</p><p><strong>Linux:</strong> Downloaded packages may be described as third-party/untrusted because they are outside your distribution repository. AppImage files may need permission to execute, set in file Properties.</p><p>Download only from this project\'s GitHub releases. Do not disable antivirus, SmartScreen or Gatekeeper globally. A malware or damaged-file warning needs investigation; do not assume every warning is harmless.</p><div class="row">'+link('Microsoft signing guidance','https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation')+link('Apple installation guidance','https://support.apple.com/102445')+link('AppImage guide','https://docs.appimage.org/introduction/quickstart.html')+'</div></details></section>';
+}

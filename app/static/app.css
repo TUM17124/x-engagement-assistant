@@ -20,3 +20,17 @@
 .work-status{position:fixed;bottom:14px;right:18px;z-index:30;max-width:min(680px,calc(100vw - 36px));padding:12px 16px;border:1px solid #3b4858;border-radius:12px;background:#1b2330;color:#e8edf5;box-shadow:0 8px 35px #0008;font-size:13px}.work-status[hidden],.activity-panel[hidden]{display:none}.work-status button{margin-left:8px;padding:5px 8px;font-size:12px}.work-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#8abf9e;margin-right:8px}.work-dot.working,.work-dot.waiting{background:#e6b86a}.work-dot.failed,.work-dot.attention{background:#ef8c89}.activity-panel{position:fixed;right:18px;bottom:80px;z-index:35;width:min(600px,calc(100vw - 36px));max-height:75vh;overflow:auto;background:#151c26;border:1px solid #3b4858;border-radius:14px;padding:18px;box-shadow:0 12px 40px #0009}.terminal-report{border-left:3px solid #80bd9a;margin-top:14px}.content{padding-bottom:100px}
 
 .radar-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:18px}.radar-card{min-width:0}.radar-card h2{font-size:1.2rem}.radar-card .preview{max-height:260px;overflow:auto;white-space:pre-wrap}.radar-media video,.radar-media img{width:100%;max-height:360px;object-fit:contain}.radar-media audio{width:100%}.radar-card details{margin-top:16px}
+
+/* Unified terminal conversation and editable multiline prompt. */
+.terminal-interactive{border:1px solid var(--border,#344152);border-radius:14px;background:var(--bg);overflow:hidden}
+.terminal-interactive .terminal-state{padding:14px 22px;border-bottom:1px solid #ffffff14;color:var(--muted,#a9b4c5)}
+.terminal-interactive .terminal-output{height:45vh;padding:12px 22px}
+.terminal-interactive #terminal-approvals,.terminal-interactive #terminal-choices{padding:0 22px;max-height:38vh;overflow:auto}
+.terminal-interactive .terminal-prompt{display:flex;align-items:flex-start;gap:12px;margin:0;padding:18px 22px;border-top:1px solid #ffffff14;background:inherit}
+.terminal-prompt>span{padding-top:7px;color:#a6b7df;font-weight:bold}
+.terminal-prompt textarea{flex:1;min-width:0;min-height:84px;max-height:45vh;resize:vertical;border:0;box-shadow:none;background:transparent;color:inherit;font:inherit;line-height:1.6;padding:4px;white-space:pre-wrap}
+.terminal-prompt textarea:focus{outline:1px solid #8195b655;outline-offset:4px}
+.terminal-prompt .terminal-send{align-self:flex-end;background:transparent;border:1px solid #ffffff25;padding:6px 10px;font-size:12px}
+.terminal-toolbar{display:flex;flex-wrap:wrap;gap:8px;padding:0 22px 12px}.terminal-toolbar button{font-size:12px}
+.terminal-tip{padding:12px 22px;background:#ffffff05;color:var(--muted,#a9b4c5);font-size:13px}
+.terminal-options{padding:12px 0;display:flex;gap:8px;flex-wrap:wrap}.terminal-options p{width:100%;margin:0 0 5px}.terminal-options button{font-size:13px}

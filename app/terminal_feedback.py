@@ -1,8 +1,8 @@
 """Grounded conversational summaries: no second model or invented action results."""
 import json
 
-YES={"yes","y","confirm","go ahead","yes please","yes post it","yes publish it","yes approve"}
-NO={"no","n","cancel","cancel it","don't","do not","reject"}
+YES={"1","yes","y","confirm","go ahead","yes please","yes post it","yes publish it","yes approve"}
+NO={"2","no","n","cancel","cancel it","don't","do not","reject"}
 def confirmation_word(text):
     value=text.strip().lower().rstrip('.!')
     return True if value in YES else False if value in NO else None
@@ -48,13 +48,14 @@ def next_steps(tool,value):
     if tool.startswith("profile.") or tool.startswith("settings.") or tool=="system.limits":return [{"label":"Review Settings","url":"#settings"}]
     if tool.startswith("topics."):return [{"label":"Review Topic Radar","url":"#topics"}]
     if tool.startswith("ideas."):return [{"label":"Open Ideas","url":"#ideas"}]
+    if tool.startswith("video."):return [{"label":"Review video settings and jobs","url":"#media"}]
     if tool.startswith("media."):return [{"label":"Open Media to choose or edit a file","url":"#media"}]
     if tool.startswith("automations."):return [{"label":"Review automation state and run history","url":"#automations"}]
     if tool=="content.publish":return [{"label":"View confirmed post IDs in History","url":"#history"}]
     if tool=="social.search" and isinstance(value,dict) and value.get("mode")=="web":
         return [{"label":"Open the same search on X, then import a post","url":value["web_url"]}]
     if tool.startswith("social."):return [{"label":"Review posts in Social Feed","url":"#feed"}]
-    if tool=="trends.analyze":return [{"label":"Explore Trend Radar","url":"#trends"}]
+    if tool.startswith("trends."):return [{"label":"Explore Trend Radar","url":"#trends"}]
     return []
 
 def completion_report(result):

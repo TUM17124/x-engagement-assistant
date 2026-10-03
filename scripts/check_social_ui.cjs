@@ -6,7 +6,7 @@ const ctx = {
   URLSearchParams,
   FormData,
   Date,
-  setTimeout,
+  setTimeout:()=>0,
   clearTimeout,
   URL,
   document: {
@@ -29,6 +29,7 @@ for (const file of [
   "social",
   "social-actions",
   "terminal",
+  "terminal-interactive",
   "ai-providers",
   "trends",
   "video",

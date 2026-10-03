@@ -135,3 +135,15 @@ class UpdateTests(AppTest):
         db.set_setting("release_status",{"version":updates.VERSION,"checked_at":"today"})
         response=self.client.get("/api/updates").json()
         self.assertIn("Unpublished local changes",response["release_message"])
+
+    def test_download_links_exist_only_for_official_published_assets(self):
+        data=release();parsed=updates.parse_release(data)
+        downloads={d["id"]:d for d in parsed["downloads"]}
+        self.assertTrue(downloads["windows-x64"]["available"])
+        self.assertIsNone(downloads["macos-arm64"]["url"])
+        base=updates.GITHUB+"/releases/download/v9.0.0/"
+        assets={filename:base+filename for _,_,filename in updates.PLATFORM_INSTALLERS}
+        self.assertTrue(all(d["available"] for d in updates.installer_downloads(assets,base)))
+        assets["Social-Engagement-Command-Center-arm64.dmg"]="https://evil.test/app.dmg"
+        downloads={d["id"]:d for d in updates.installer_downloads(assets,base)}
+        self.assertFalse(downloads["macos-arm64"]["available"])

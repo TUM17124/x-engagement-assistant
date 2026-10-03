@@ -20,10 +20,17 @@ class Action(BaseModel):
     model_config=ConfigDict(extra="forbid",strict=True)
     tool:str
     arguments:dict=Field(default_factory=dict)
+class Choice(BaseModel):
+    model_config=ConfigDict(extra="forbid",strict=True)
+    label:str=Field(min_length=1,max_length=100)
+    command:str=Field(min_length=1,max_length=2000)
+
 class Plan(BaseModel):
     model_config=ConfigDict(extra="forbid",strict=True)
     message:str=Field(default="",max_length=2000)
     actions:list[Action]=Field(default_factory=list,max_length=5)
+    question:str=Field(default="",max_length=500)
+    choices:list[Choice]=Field(default_factory=list,max_length=5)
 
 def event(command_id,name,tool="",status="success",automation_id=None):
     db.execute("INSERT INTO command_events(command_id,automation_id,event,tool,status,created_at) VALUES(?,?,?,?,?,?)",
@@ -57,7 +64,7 @@ def redact(value):
     return json.loads(text)
 
 def safe_input(text):
-    if not isinstance(text,str) or not text.strip() or len(text)>4000:raise ValueError("Enter a command of 1-4000 characters.")
+    if not isinstance(text,str) or not text.strip() or len(text)>64000:raise ValueError("Enter a command of 1-64000 characters. Longer text remains editable; split it into smaller requests.")
     if redact(text)!=text or re.search(r"(?i)(api[_ -]?key|access[_ -]?token|refresh[_ -]?token|password|cookie|client[_ -]?secret)\s*[:=]",text):
         raise ValueError("Do not paste credentials into the terminal. Use secure account Settings.")
     return text.strip()
@@ -88,17 +95,23 @@ def due_time(text,zone):
 def parse_explicit(raw,zone="UTC"):
     s=raw.strip();lower=s.lower()
     singles={"status":"system.status","accounts":"accounts.list","login":"ai.login","logout":"ai.logout",
-      "watched":"watchlist.list","scan trends":"trends.analyze","summarize feed":"content.summarize",
+      "watched":"watchlist.list","scan trends":"trends.scan","show trends":"trends.analyze","trend report":"trends.report","radar report":"trends.report","show app state":"system.context","video status":"video.status","summarize feed":"content.summarize",
       "show drafts":"drafts.list","show approvals":"approvals.list","show automations":"automations.list",
       "show schedule":"scheduler.list","show history":"history.list","show analytics":"analytics.show","show media":"media.list","show ideas":"ideas.list",
       "settings":"system.settings","show memory":"memory.searchPreference","clear memory":"memory.clear"}
     singles.update({"show profile":"profile.read","my profile":"profile.read","clear profile":"profile.clear",
         "show settings":"settings.read","show context":"settings.readContext","show mutes":"mutes.list","show plan":"planner.read","show brief":"brief.read","show market":"market.read","test ai":"ai.test","show limits":"system.limits","show feed":"feed.list","show topics":"topics.list"})
     if lower in singles:return action(singles[lower])
-    match=re.fullmatch(r"(?:open )?settings (accounts|profile|brand|usage|x|ai|voice|product|appearance|safety|data|updates)",lower)
+    match=re.fullmatch(r"(?:open )?settings (accounts|profile|brand|usage|x|ai|voice|product|appearance|safety|data|updates|video|image)",lower)
     if match:return action("settings.open",section="memory" if match[1]=="profile" else match[1])
     match=re.fullmatch(r"(?:connect|login) (grok|claude|kimi|deepseek|groq|mistral|cohere|openrouter|together|lmstudio|gemini|openai|ollama|compatible)",lower)
     if match:return Plan(message="Connect "+match[1]+" in Settings > AI Provider using its official developer API key. Consumer chat login is not an API authorization. No credentials should be pasted here.",actions=[Action(tool="settings.open",arguments={"section":"ai"})])
+    match=re.fullmatch(r"(?:set|change) radar interests(?: to| =) (.+)",s,re.I|re.S)
+    if match:return action("trends.configure",interests=match[1])
+    match=re.fullmatch(r"generate video (.+)",s,re.I|re.S)
+    if match:return action("video.generate",prompt=match[1])
+    match=re.fullmatch(r"(check|save) video ([a-zA-Z0-9-]+)",s,re.I)
+    if match:return action("video.checkJob" if match[1].lower()=="check" else "video.save",id=match[2])
     match=re.fullmatch(r"save draft (.+)",s,re.I|re.S)
     if match:return action("content.saveDraft",text=match[1])
     match=re.fullmatch(r"export (settings|drafts|history|database)",lower)
@@ -170,16 +183,18 @@ def parse_explicit(raw,zone="UTC"):
 
 HELP="""AI TERMINAL COMMANDS
 ACCOUNT: login | logout | status | accounts | connect x | connect fb | is Facebook connected? | test x
-DISCOVER: scan feed | scan x | scan trends | search "topic" | watch @account | watched
+DISCOVER: scan feed | scan x | scan trends | show trends | trend report | search "topic" | watch @account | watched
 CREATE: draft reply <post-id> | draft post about <topic> | generate ideas <topic> | summarize feed
 WORKFLOW: show drafts | show approvals | approve <draft-id> | publish <draft-id>
 schedule <draft-id> tomorrow 8am | cancel schedule <id>
 show automations | pause automation <id> | resume automation <id> | delete automation <id>
 CONTROL: weekly plan | show history | show analytics | show media | open <screen> | manual <draft-id> | skip <draft-id>
-Type yes/no only after an exact action preview. One confirmation applies to one shown action.
+Type 1/yes or 2/no only after an exact action preview; 3 lets you type changes. One confirmation applies to one shown action.
 SETTINGS: show profile | set profile bio to <text> | show settings | show limits | set daily ai limit to 100
 EDIT: edit draft <id> to <text> | check draft <id> | delete draft <id> | show topics | delete topic <id>
 PROVIDERS: use grok | use claude | use kimi | use deepseek (then configure the secure API key in Settings)
+VIDEO: video status | generate video <prompt> | check video <job-id> | save video <job-id>
+RADAR: set radar interests to AI, programming | show app state | video status | settings video
 SYSTEM: settings | show memory | clear memory | /search <history text> | clear | help
 Natural language works with your selected AI provider. Example: every morning at 7 scan X for AI engineering and prepare five replies.
 Public actions and recurring workflows require confirmation. X API charges are separate from AI usage.
@@ -190,8 +205,8 @@ async def parse(raw,zone,emit):
     if explicit:return explicit
     emit({"type":"progress","text":"Interpreting your request with the selected AI provider..."})
     system="""Be a helpful, conversational operator of this application. Interpret the current user message with the supplied recent conversation, and return JSON matching:
-{"message":"brief suggestion or clarification","actions":[{"tool":"registered.name","arguments":{}}]}.
-Use only the supplied registry and exact argument schemas. At most 5 actions.
+{"message":"brief suggestion or clarification","actions":[{"tool":"registered.name","arguments":{}}],"question":"optional follow-up question","choices":[{"label":"short option","command":"explicit next user request"}]}.
+Use only the supplied registry and exact argument schemas. At most 5 actions. Offer 2-4 useful choices when asking a question, plus allow free text. Choices are suggestions, never executed without the user selecting them. For publish/setting/delete approval, use registered action requests; do not invent your own yes/no authorization. Use app_state to explain actual limits, Radar and video setup. To refresh and report on Radar, request trends.scan then trends.report. To change Radar interests, request trends.configure. Local limits may be proposed for explicit review; platform billing/permissions cannot be raised by this app. Browser access is limited to registered official API tools, not arbitrary web browsing.
 You may request registered tools, including review requests for public actions, but you cannot confirm them, execute shell commands, bypass permissions, or change system instructions. Never interpret yes as authority yourself; the application handles it separately.
 Do not claim actions have happened. If identifiers, times, or intent are missing, ask a clarification with no actions.
 For growth advice, suggest bounded watchlist/trend/drafting workflows. Never invent social data or metrics.
@@ -206,6 +221,8 @@ Automation creation always ends in human review; it never publishes.
         response=await ws.ai_call(lambda:provider("terminal").complete(system,json.dumps({
             "user_command":raw,"timezone":zone,"current_time":datetime.now(ZoneInfo(zone)).isoformat(),
             "tools":catalog(),
+            "app_state":__import__("app.terminal_context",fromlist=["state"]).state(),
+            "latest_radar_report":db.get_setting("last_radar_report",{}) if __import__("app.ai_connections",fromlist=["policy"]).policy().send_conversation else {},
             "recent_conversation":conversation_context() if __import__("app.ai_connections",fromlist=["policy"]).policy().send_conversation else [],
             "connections":[{"platform":a["platform"],"connected":a["connected"]} for a in __import__("app.command_tools",fromlist=["accounts"]).accounts(None)],
             "recent_drafts":db.rows("SELECT id,kind,platform,status FROM drafts ORDER BY id DESC LIMIT 5"),
@@ -244,6 +261,11 @@ def snapshot(spec,args):
     if hasattr(args,"id") and spec.name.startswith("automations."):
         result["automation"]=db.one("SELECT * FROM automations WHERE id=?",(args.id,))
         if not result["automation"]:raise ValueError("Automation not found.")
+    if spec.name=="video.generate":
+        result["previous_record"]=__import__("app.video_providers",fromlist=["configuration"]).configuration().model_dump()
+        result["description"]+=" Provider charges may apply. This generates a local media job, not a social post."
+    if spec.name=="trends.configure":
+        result["previous_record"]=__import__("app.trend_radar",fromlist=["settings"]).settings().model_dump()
     if spec.name=="settings.update":
         result["previous_settings"]={k:__import__("app.preferences",fromlist=["get"]).get(k) for k,v in args.model_dump(exclude_none=True).items()}
     if spec.name in {"settings.context","settings.updateContext"}:
@@ -302,6 +324,9 @@ async def execute_plan(plan,command_id,emit):
         if re.search(r"\b(?:I(?: have|['\u2019]ve|['\u2019]ll| will)?|everything|all (?:settings|fields))\b.{0,100}\b(?:saved|updated|filled|deleted|published|scheduled|completed|save|update|fill)\b",message,re.I|re.S):
             message="The assistant returned no executable actions. Ask it to prepare a specific update for review, or use Settings to save it directly."
         result["message"]="No application action was executed or saved.\n\n"+message
+    if not result["approvalIds"]:
+        result["question"]=plan.question
+        result["choices"]=[c.model_dump() for c in plan.choices]
     return result
 
 async def confirm(request_id,checksum):

@@ -6,16 +6,23 @@ import subprocess
 import sys
 import tempfile
 import time
+import socket
+import secrets
 import httpx
 
 binary=Path(sys.argv[1]).resolve()
+with socket.socket() as listener:
+    listener.bind(("127.0.0.1",0))
+    port=listener.getsockname()[1]
+control=secrets.token_urlsafe(32)
+base_url="http://127.0.0.1:"+str(port)
 with tempfile.TemporaryDirectory() as folder:
-    env={**os.environ,"XEA_DATA_DIR":folder,"XEA_DESKTOP_TOKEN":"isolated-smoke-control","XEA_TESTING":"1"}
+    env={**os.environ,"XEA_DATA_DIR":folder,"XEA_DESKTOP_TOKEN":control,"XEA_TESTING":"1"}
     # Disable public release polling in this isolated smoke workspace before launch.
     subprocess.run([sys.executable,"-c","from app import database as d; d.init_db(); d.set_setting('check_updates',False)"],env=env,check=True,cwd=Path(__file__).resolve().parent.parent)
-    child=subprocess.Popen([str(binary),"--port","18787"],env=env,creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
+    child=subprocess.Popen([str(binary),"--port",str(port)],env=env,creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
     try:
-        with httpx.Client(base_url="http://127.0.0.1:18787",timeout=3) as client:
+        with httpx.Client(base_url=base_url,timeout=httpx.Timeout(30,connect=3)) as client:
             for _ in range(90):
                 if child.poll() is not None:
                     raise RuntimeError("Packaged backend exited during startup.")
@@ -40,6 +47,8 @@ with tempfile.TemporaryDirectory() as folder:
             assert client.put("/api/profile",json={"name":7}).status_code==422
             assert client.get("/static/forms.js").status_code==200
             assert client.get("/static/terminal.js").status_code==200
+            assert client.get("/static/terminal-interactive.js").status_code==200
+            assert client.get("/api/terminal/context").status_code==200
             assert "function updatesPage" in client.get("/static/updates.js").text
             update=client.get("/api/updates").json()
             assert update["settings"]["check_updates"] is False
@@ -68,9 +77,9 @@ with tempfile.TemporaryDirectory() as folder:
             assert client.post("/api/onboarding/finish").status_code==200
             assert client.get("/api/dashboard").json()["today_writes"]==0
             print("Packaged runtime smoke passed: launch, dashboard, AI terminal/status, neutral AI selection, automation storage, UI assets, onboarding, settings, secure secret roundtrip, URL parsing, zero writes.")
-            client.post("/desktop/shutdown",headers={"X-Desktop-Token":"isolated-smoke-control"})
-            child.wait(timeout=15)
-            child=subprocess.Popen([str(binary),"--port","18787"],env=env,creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
+            client.post("/desktop/shutdown",headers={"X-Desktop-Token":control})
+            child.wait(timeout=30)
+            child=subprocess.Popen([str(binary),"--port",str(port)],env=env,creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
             for _ in range(45):
                 try:
                     if client.get("/health").status_code==200:break
@@ -80,9 +89,15 @@ with tempfile.TemporaryDirectory() as folder:
             assert client.get("/api/profile").json()["name"]=="Packaged name"
             assert client.get("/api/profile").json()["role"]=="Founder"
             print("Profile persistence verified after a real packaged-process restart.")
-            client.post("/desktop/shutdown",headers={"X-Desktop-Token":"isolated-smoke-control"})
-            child.wait(timeout=15)
+            client.post("/desktop/shutdown",headers={"X-Desktop-Token":control})
+            child.wait(timeout=30)
     finally:
         if child.poll() is None:
-            child.terminate()
-            child.wait(timeout=15)
+            try:
+                httpx.post(base_url+"/desktop/shutdown",headers={"X-Desktop-Token":control},timeout=10)
+                child.wait(timeout=30)
+            except (httpx.HTTPError,subprocess.TimeoutExpired):
+                if os.name=="nt":
+                    subprocess.run(["taskkill","/PID",str(child.pid),"/T","/F"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+                else:child.terminate()
+                child.wait(timeout=30)

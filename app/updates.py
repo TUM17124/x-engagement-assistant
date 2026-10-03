@@ -35,6 +35,19 @@ def version_tuple(value):
         raise ValueError("The release version is not a stable version.")
     return tuple(int(p) for p in value.lstrip("v").split("."))
 
+PLATFORM_INSTALLERS = (
+    ("windows-x64", "Windows 10/11 (64-bit)", "Social-Engagement-Command-Center-Setup.exe"),
+    ("macos-arm64", "macOS (Apple Silicon)", "Social-Engagement-Command-Center-arm64.dmg"),
+    ("macos-x64", "macOS (Intel)", "Social-Engagement-Command-Center-x64.dmg"),
+    ("linux-deb", "Linux Ubuntu/Debian (64-bit)", "Social-Engagement-Command-Center-x64.deb"),
+    ("linux-appimage", "Linux AppImage (64-bit)", "Social-Engagement-Command-Center-x64.AppImage"),
+)
+
+def installer_downloads(assets, expected):
+    return [{"id":ident,"name":name,"available":assets.get(filename)==expected+filename,
+             "url":expected+filename if assets.get(filename)==expected+filename else None}
+            for ident,name,filename in PLATFORM_INSTALLERS]
+
 def parse_release(data):
     if not isinstance(data, dict) or data.get("draft") or data.get("prerelease"):
         raise ValueError("GitHub did not return a published stable release.")
@@ -50,7 +63,8 @@ def parse_release(data):
     signed = assets.get("latest.json") == expected + "latest.json" and assets.get(UPDATE_ASSET+".sig") == expected+UPDATE_ASSET+".sig"
     return {"version": version, "available": version_tuple(version)>version_tuple(VERSION),
             "notes": str(data.get("body") or "")[:12000], "published_at": data.get("published_at"),
-            "release_url": release_url, "download_url": expected + ASSET, "signed": signed}
+            "release_url": release_url, "download_url": expected + ASSET, "signed": signed,
+            "downloads": installer_downloads(assets, expected)}
 
 def release_message(release):
     if release.get("error"):

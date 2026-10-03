@@ -10,6 +10,17 @@ fn progress(token: &str, id: &str, state: &str, message: &str, downloaded: usize
         .json(&json!({"id":id,"state":state,"message":message,"downloaded":downloaded,"total":total})).send();
 }
 
+fn expected_download_url(version: &str, os: &str, arch: &str) -> Result<String, String> {
+    let asset = match (os, arch) {
+        ("windows", "x86_64") => "Social-Engagement-Command-Center-Setup.exe",
+        ("macos", "aarch64") => "Social-Engagement-Command-Center-arm64.app.tar.gz",
+        ("macos", "x86_64") => "Social-Engagement-Command-Center-x64.app.tar.gz",
+        ("linux", "x86_64") => "Social-Engagement-Command-Center-x64.AppImage",
+        _ => return Err("Signed updates are not available for this operating system and architecture.".into()),
+    };
+    Ok(format!("https://github.com/TUM17124/x-engagement-assistant/releases/download/v{version}/{asset}"))
+}
+
 pub fn run(app: AppHandle, token: String, job: Value) {
     let id = job["id"].as_str().unwrap_or("").to_string();
     let version = job["version"].as_str().unwrap_or("").to_string();
@@ -19,7 +30,7 @@ pub fn run(app: AppHandle, token: String, job: Value) {
             .map_err(|_| "The signed updater could not start.")?.check().await
             .map_err(|_| "Could not read the signed GitHub release. Check your connection, then check for updates again.")?
             .ok_or("No newer signed update is available.")?;
-        let expected = format!("https://github.com/TUM17124/x-engagement-assistant/releases/download/v{}/Social-Engagement-Command-Center-Setup.exe",version);
+        let expected = expected_download_url(&version, std::env::consts::OS, std::env::consts::ARCH)?;
         if update.version != version || update.download_url.as_str() != expected {
             return Err("The release changed after your approval. Check for updates and review it again.".into());
         }
@@ -52,6 +63,8 @@ pub fn run(app: AppHandle, token: String, job: Value) {
         }
         if let Some(child)=app.state::<Backend>().child.lock().unwrap().take() { let _=child.kill(); }
         update.install(&bytes).map_err(|_| "The system could not start the installer. Reopen the app or download the release from GitHub.")?;
+        #[cfg(not(target_os = "windows"))]
+        app.restart();
         Ok(())
     })();
     if let Err(message)=result {
@@ -60,5 +73,18 @@ pub fn run(app: AppHandle, token: String, job: Value) {
             let script=format!("if(typeof errorPanel==='function')errorPanel(new Error({}), 'App update');",serde_json::to_string(&message).unwrap());
             let _=window.eval(&script);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::expected_download_url;
+    #[test]
+    fn updater_targets_native_artifact() {
+        assert!(expected_download_url("0.3.3", "windows", "x86_64").unwrap().ends_with("/v0.3.3/Social-Engagement-Command-Center-Setup.exe"));
+        assert!(expected_download_url("0.3.3", "macos", "aarch64").unwrap().ends_with("-arm64.app.tar.gz"));
+        assert!(expected_download_url("0.3.3", "macos", "x86_64").unwrap().ends_with("-x64.app.tar.gz"));
+        assert!(expected_download_url("0.3.3", "linux", "x86_64").unwrap().ends_with("-x64.AppImage"));
+        assert!(expected_download_url("0.3.3", "linux", "aarch64").is_err());
     }
 }
