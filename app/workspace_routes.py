@@ -133,10 +133,10 @@ async def generate_compose(data: AIInput):
         raise ValueError("Choose an available AI tool.")
     if data.operation=="Check repetitive wording":
         recent=db.rows("SELECT text FROM actions ORDER BY id DESC LIMIT 20")
-        return {"text":await ws.ai_call(lambda:provider().rewrite(data.text,
+        return {"text":await ws.ai_call(lambda:provider("posts").rewrite(data.text,
             "Give brief feedback only on repetitive wording versus these previous posts: "+json.dumps(recent)))}
-    result=await ws.ai_call(lambda:provider().generate_post(data.text,data.kind) if data.operation=="Generate post"
-                            else provider().rewrite(data.text,data.operation))
+    result=await ws.ai_call(lambda:provider("posts").generate_post(data.text,data.kind) if data.operation=="Generate post"
+                            else provider("posts").rewrite(data.text,data.operation))
     return {"text":result}
 
 @router.post("/drafts/{draft_id}/approve")
@@ -276,7 +276,7 @@ async def refresh_topic(item_id: int):
 
 @router.post("/topics/suggest/query")
 async def suggest_query(data: TopicInput):
-    result=await ws.ai_call(lambda:provider().rewrite(json.dumps(data.model_dump()),
+    result=await ws.ai_call(lambda:provider("posts").rewrite(json.dumps(data.model_dump()),
        "Return ONLY an X search query matching these keywords, exclusions, and languages. Use official public search syntax, no explanation."))
     return {"query":result[:2000]}
 

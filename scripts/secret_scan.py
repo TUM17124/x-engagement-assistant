@@ -22,7 +22,7 @@ def check(name,content):
 
 def main():
     staged="--staged" in sys.argv
-    names=subprocess.check_output(["git","diff","--cached","--name-only","--diff-filter=ACM"] if staged else ["git","ls-files"],text=True).splitlines()
+    names=subprocess.check_output(["git","diff","--cached","--name-only","--diff-filter=ACM"] if staged else ["git","ls-files","--cached","--others","--exclude-standard"] if "--working-tree" in sys.argv else ["git","ls-files"],text=True).splitlines()
     errors=[]
     for name in names:
         if not Path(name).is_file() and not staged:

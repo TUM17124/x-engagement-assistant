@@ -1,6 +1,8 @@
 """GitHub release discovery, free email signup links, and approved signed updates."""
 import asyncio
 import os
+import sys
+import platform
 import re
 import time
 import uuid
@@ -16,7 +18,12 @@ from .desktop_control import authorize
 REPOSITORY = "TUM17124/x-engagement-assistant"
 GITHUB = "https://github.com/" + REPOSITORY
 RELEASE_API = "https://api.github.com/repos/" + REPOSITORY + "/releases/latest"
-ASSET = "Social-Engagement-Command-Center-Setup.exe"
+def native_asset():
+    if sys.platform=="win32":return "Social-Engagement-Command-Center-Setup.exe"
+    arch="arm64" if platform.machine().lower() in {"arm64","aarch64"} else "x64"
+    return "Social-Engagement-Command-Center-"+arch+(".dmg" if sys.platform=="darwin" else ".AppImage")
+ASSET = native_asset()
+UPDATE_ASSET=ASSET.replace(".dmg",".app.tar.gz")
 DOWNLOAD = GITHUB + "/releases/latest/download/" + ASSET
 EMAIL_SIGNUP = "https://blogtrottr.com/?subscribe=https%3A%2F%2Fgithub.com%2F"+REPOSITORY.replace("/", "%2F")+"%2Freleases.atom"
 CHECK_LOCK = asyncio.Lock()
@@ -39,11 +46,28 @@ def parse_release(data):
     expected = GITHUB + "/releases/download/v" + version + "/"
     assets = {a.get("name"): a.get("browser_download_url") for a in data.get("assets", [])}
     if assets.get(ASSET) != expected + ASSET:
-        raise ValueError("This release does not yet include the Windows installer.")
-    signed = assets.get("latest.json") == expected + "latest.json" and assets.get(ASSET+".sig") == expected+ASSET+".sig"
+        raise ValueError("This release does not yet include an installer for this operating system and architecture.")
+    signed = assets.get("latest.json") == expected + "latest.json" and assets.get(UPDATE_ASSET+".sig") == expected+UPDATE_ASSET+".sig"
     return {"version": version, "available": version_tuple(version)>version_tuple(VERSION),
             "notes": str(data.get("body") or "")[:12000], "published_at": data.get("published_at"),
             "release_url": release_url, "download_url": expected + ASSET, "signed": signed}
+
+def release_message(release):
+    if release.get("error"):
+        return release["error"]
+    if release.get("message"):
+        return release["message"]
+    if not release.get("version") or not release.get("checked_at"):
+        return "No successful GitHub release check has completed yet."
+    try:
+        published, installed = version_tuple(release["version"]), version_tuple(VERSION)
+    except ValueError:
+        return "Saved release information is invalid. Check for updates again."
+    if published > installed:
+        return "Published version " + release["version"] + " is available."
+    if published < installed:
+        return "This local build (" + VERSION + ") is newer than the latest published GitHub release (" + release["version"] + ")."
+    return "Installed version " + VERSION + " matches the latest published GitHub release. Unpublished local changes are not checked or installed here."
 
 def status():
     release=db.get_setting("release_status", {})
@@ -51,6 +75,7 @@ def status():
         release["available"]=version_tuple(release["version"])>version_tuple(VERSION)
     return {"current_version": VERSION, "repository": GITHUB, "download_url": DOWNLOAD,
             "desktop": bool(os.getenv("XEA_DESKTOP_TOKEN")), "release": release,
+            "release_message": release_message(release),
             "installation": db.get_setting("update_installation", {}), "email_signup_url": EMAIL_SIGNUP,
             "settings": {"check_updates":prefs.get("check_updates")}}
 
@@ -109,7 +134,7 @@ def busy():
 @router.post("/api/updates/install")
 async def install(data:InstallRequest):
     if not os.getenv("XEA_DESKTOP_TOKEN"):
-        raise ValueError("Open the installed desktop app to update, or download the Windows installer from GitHub.")
+        raise ValueError("Open the installed desktop app to update, or download the installer for your operating system from GitHub.")
     release=db.get_setting("release_status",{})
     if not data.confirmed or not release.get("available") or not release.get("signed") or release.get("error") or data.version!=release.get("version"):
         raise ValueError("Check for updates and explicitly confirm the displayed signed release first.")

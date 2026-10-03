@@ -10,7 +10,7 @@ DEFAULTS = {
     "my_profile": {}, "brand_voice": {}, "image_provider": {},
     "notify_priority": True, "notify_mentions": True, "notify_connections": True,
     "x_client_id": "", "x_redirect_uri": "http://127.0.0.1:8787/auth/callback",
-    "ai_provider": "chatgpt", "chatgpt_model": "", "ai_model": "", "ai_base_url": "",
+    "ai_provider": "", "chatgpt_model": "", "ai_model": "", "ai_base_url": "",
     "discovery_mode": "automatic", "daily_search_limit": 20,
     "onboarded": False, "interests": [], "theme": "dark", "notifications": False,
     "tray_enabled": False, "monitoring": False, "read_access": False, "poll_minutes": 30,
@@ -50,7 +50,7 @@ def save(values, persist=True):
                 raise ValueError("Profile fields must be text, up to 4000 characters.")
         if key == "interests" and (not isinstance(value, list) or len(value) > 50 or any(not isinstance(x,str) or len(x)>100 for x in value)):
             raise ValueError("Enter up to 50 short interests.")
-        if key == "ai_provider" and value not in {"chatgpt","gemini","openai","compatible","ollama","grok","claude","kimi","deepseek"}:
+        if key == "ai_provider" and value and value not in __import__("app.ai_registry",fromlist=["CATALOG"]).CATALOG:
             raise ValueError("Choose a supported AI provider.")
         if key == "discovery_mode" and value not in {"automatic","api","web"}:
             raise ValueError("Choose Automatic, X API Search, or X Web Search.")
@@ -66,13 +66,40 @@ def save(values, persist=True):
             url = urlsplit(value)
             if url.scheme != "http" or url.hostname not in {"127.0.0.1", "localhost"} or url.path != "/auth/callback":
                 raise ValueError("Use the local callback URL shown in X Connection.")
+        if key in {"voice","product","brand_voice","my_profile"}:
+            from .context_settings import canonical_fields
+            value = canonical_fields(key,value)
         checked[key] = value
+    if "ai_base_url" in checked:
+        import json
+        kind=checked.get("ai_provider",get("ai_provider"))
+        row=db.one("SELECT config FROM ai_connections WHERE id=?",(kind,))
+        if kind in {"compatible","ollama","lmstudio"} and row and store.get("ai_api_key_"+kind):
+            if checked["ai_base_url"]!=json.loads(row["config"])["base_url"]:
+                raise ValueError("Change an endpoint through AI Providers and re-enter its key.")
     if persist:
-        for key, value in checked.items():
-            if key in {"ai_provider","ai_model","ai_base_url"} and get(key) != value:
-                db.set_setting("ai_health",None)
-                db.set_setting("ai_pause",{})
-            db.set_setting(key, value)
+        import json
+        reset_health=any(key in {"ai_provider","ai_model","ai_base_url"} and get(key)!=value for key,value in checked.items())
+        with db.conn() as connection:
+            if reset_health:checked.update(ai_health=None,ai_pause={})
+            for key,value in checked.items():
+                connection.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(key,json.dumps(value)))
+    if persist and any(k in checked for k in ("ai_model","ai_base_url","chatgpt_model")):
+        kind=get("ai_provider")
+        row=db.one("SELECT config FROM ai_connections WHERE id=?",(kind,))
+        if row:
+            data=json.loads(row["config"])
+            if "ai_model" in checked and kind!="chatgpt":data["model"]=checked["ai_model"]
+            if "chatgpt_model" in checked and kind=="chatgpt":data["model"]=checked["chatgpt_model"]
+            if "ai_base_url" in checked and kind in {"compatible","ollama","lmstudio"}:
+                if checked["ai_base_url"]!=data["base_url"] and store.get("ai_api_key_"+kind):
+                    # Leave credentials bound to the original endpoint; new UI verifies replacements.
+                    db.set_setting("ai_base_url",data["base_url"])
+                    raise ValueError("Change an endpoint through AI Providers and re-enter its key.")
+                data["base_url"]=checked["ai_base_url"]
+            db.execute("UPDATE ai_connections SET config=? WHERE id=?",(kind,json.dumps(data)))
+            db.execute("DELETE FROM ai_model_cache WHERE connection_id=?",(kind,))
+
 
 def bootstrap_dev_env():
     """Optional dev import; bundled builds never read a .env file."""

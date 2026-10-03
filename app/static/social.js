@@ -327,7 +327,7 @@ async function responseInboxPage() {
         ))
   );
 }
-async function trendPage() {
+async function localTrendPage() {
   const trends = await api("/api/social/trends");
   return (
     heading(
@@ -587,6 +587,7 @@ async function ideasPage() {
   );
 }
 async function mediaPage() {
+  const videoPanel=await videoStudio();
   mediaCache = await api("/api/media");
   return (
     heading(
@@ -595,7 +596,7 @@ async function mediaPage() {
     ) +
     '<div class="grid"><form id="media-upload-form" class="card"><h2>Add media</h2><input type="file" name="file" accept=".png,.jpg,.jpeg,.webp,.gif,.mp4" required><button type="submit">Upload locally</button><p class="hint">PNG, JPG, WEBP, GIF, MP4. Up to 50 MB. Nothing is uploaded to a social account.</p></form><form id="image-generation-form" class="card"><h2>Generate an image</h2>' +
     area("Image prompt", "prompt", "", "required") +
-    '<button type="submit">Generate with configured image provider</button><p class="hint">Configure a separate image endpoint in AI Provider. This sends your prompt to that endpoint.</p></form></div><form id="media-filter-form" class="row">' +
+    '<button type="submit">Generate with configured image provider</button><p class="hint">Configure a separate image endpoint in AI Provider. This sends your prompt to that endpoint.</p></form></div>' + videoPanel + '<form id="media-filter-form" class="row">' +
     input("Search name, tags, caption", "q") +
     input("Folder", "folder") +
     check("Favorites only", "favorite", false) +
@@ -633,7 +634,7 @@ function mediaCard(m) {
     input("Alt text", "alt_text", m.alt_text) +
     check("Favorite", "favorite", m.favorite) +
     '<button type="submit">Save details</button></form><div class="row">' +
-    (config.ai_provider==="chatgpt" ? '<span class="hint">Image assistance requires a separately selected vision-capable provider.</span>' : msButton("AI captions / alt text", "media-assist", m.id)) +
+    (config.ai_provider==="chatgpt" && !aiPolicy.overrides?.vision ? '<span class="hint">Image assistance requires a separately selected vision-capable provider.</span>' : msButton("AI captions / alt text", "media-assist", m.id)) +
     msButton("Usage history", "media-usage", m.id) +
     msButton("Reuse in Create", "media-reuse", m.id) +
     '<a class="btn" href="/api/media/' +
@@ -752,7 +753,7 @@ async function socialHome(d) {
           "</strong></div>",
       )
       .join("") +
-    '</div>'+chatgptCard()+'<div class="grid"><div class="card"><h2>Connected accounts</h2>' +
+    '</div>'+aiHomeCard()+'<div class="grid"><div class="card"><h2>Connected accounts</h2>' +
     accountsCache
       .map(
         (a) =>

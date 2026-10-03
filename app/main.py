@@ -22,6 +22,8 @@ from .post_urls import parse_tweet_url
 async def lifespan(app):
     db.init_db()
     prefs.bootstrap_dev_env()
+    from .ai_connections import migrate
+    migrate()
     task = None
     try:
         from .workers import run_workers
@@ -183,3 +185,21 @@ app.include_router(updates_router)
 
 from .profile import router as profile_router
 app.include_router(profile_router)
+
+from .ai_routes import router as ai_router
+app.include_router(ai_router)
+
+from .openrouter_auth import router as openrouter_router
+app.include_router(openrouter_router)
+
+from fastapi.exceptions import RequestValidationError
+@app.exception_handler(RequestValidationError)
+async def request_validation_error(request,error):
+    # Pydantic input/context may contain the entire submitted credential object.
+    return JSONResponse({"error":"Invalid request fields. Check field types, required values and length limits.","technical":"App validation error"},status_code=422)
+
+from .trend_radar import router as trend_router
+app.include_router(trend_router)
+
+from .video_providers import router as video_router
+app.include_router(video_router)

@@ -29,6 +29,10 @@ def replace_secret(name: str, value: SecretInput):
         from .database import set_setting
         set_setting("ai_health",None)
         set_setting("ai_pause",{})
+        from . import database as db
+        kind=prefs.get("ai_provider")
+        db.execute("DELETE FROM ai_model_cache WHERE connection_id=?",(kind,))
+        db.execute("UPDATE ai_connections SET health='{}' WHERE id=?",(kind,))
     return {"masked": store.masked(secret_name(name))}
 
 @router.delete("/secrets/{name}")

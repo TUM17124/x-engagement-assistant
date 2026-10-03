@@ -1,4 +1,7 @@
 async function submit(f){
+if(["video-provider-form","video-generation-form"].includes(f.id))return videoSubmit(f);
+if(["radar-settings-form","radar-filter-form"].includes(f.id)||f.classList.contains("radar-draft-form"))return radarSubmit(f);
+if(['provider-config-form','ai-policy-form'].includes(f.id))return aiSubmit(f);
 if(f.id==='update-settings-form'){await api('/api/settings','PUT',{check_updates:f.elements.check_updates.checked});config.check_updates=f.elements.check_updates.checked;updateState=await api('/api/updates');reportWork({state:'completed',message:'Update check preference saved.'});return render()}
 
 if(["terminal-form","automation-form","writing-preference-form"].includes(f.id))return terminalSubmit(f);
@@ -29,11 +32,13 @@ if(f.id==='discovery-form'){const next={discovery_mode:d.discovery_mode,daily_se
 if(f.id==='restore-form'){if(!confirm('Replace your workspace with this backup? Export the current workspace first if needed. Restored schedules will not publish automatically.'))return;const result=await api('/api/restore','POST',new FormData(f));toast(result.note);config=(await api('/api/settings')).settings;return render()}
 if(f.id==='legacy-form'){const result=await api('/api/import/legacy','POST',new FormData(f));toast(result.note);return render()}
 if(f.id==='settings-import-form'){const file=f.elements.file.files[0];if(file.size>100000)throw Error('Settings file is too large.');await api('/api/import/settings','POST',JSON.parse(await file.text()));config=(await api('/api/settings')).settings}
+if(!['x-form','ai-form','safety-form','profile-form','appearance-form','discovery-form','settings-import-form'].includes(f.id))throw Error('This form is unavailable in this app version. No save was performed.');
 toast('Settings saved');return render();
 }
 document.addEventListener('submit',async e=>{e.preventDefault();await runUIAction(e.submitter,()=>submit(e.target),e.submitter?.textContent||'Save form',{track:e.target.id!=='terminal-form'})});
 document.addEventListener('change',async e=>{
-if(e.target.name==='ai_provider')await runUIAction(e.target,async()=>{const previous=config.ai_provider;try{await api('/api/settings','PUT',{ai_provider:e.target.value});config.ai_provider=e.target.value;config.ai_base_url=config.ai_provider==='ollama'?'http://127.0.0.1:11434':'';config.ai_model=config.ai_provider==='gemini'?'gemini-2.5-flash':'';secretMasks=(await api('/api/settings')).secrets;if(!config.onboarded)wizard();else await render()}catch(error){e.target.value=previous;throw error}},'Change AI provider');
+if(e.target.name==='ai_provider'){aiEditing=e.target.value;if(!config.onboarded)wizard();else render();}
+
 if(e.target.name==='tweet_url'){const value=e.target.value;try{const d=await api('/parse-tweet-url?'+new URLSearchParams({tweet_url:value}));if(e.target.value!==value)return;e.target.form.elements.username.value=d.author_username;$('#url-status').textContent='@'+d.author_username+' / Tweet ID '+d.tweet_id}catch(error){if($('#url-status'))$('#url-status').textContent=error.message}}
 });
 document.addEventListener('input',e=>{if(e.target.tagName!=='TEXTAREA')return;const n=e.target.name,c=n==='text'?$('#compose-count'):document.querySelector('[data-count="'+n.replace('draft-','')+'"]');if(c){c.textContent=e.target.value.length+' characters';c.classList.toggle('over',e.target.value.length>280)}});

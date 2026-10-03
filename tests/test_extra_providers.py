@@ -20,7 +20,7 @@ class ExtraProviderTests(AppTest):
                 if cls is ClaudeProvider:self.assertEqual(payload['system'],'Instructions')
                 else:self.assertEqual(payload['input'][0]['role'],'system')
     def test_compatible_kimi_deepseek_and_fixed_endpoints(self):
-        for cls,host in [(KimiProvider,'https://api.moonshot.ai/v1'),(DeepSeekProvider,'https://api.deepseek.com/v1')]:
+        for cls,host in [(KimiProvider,'https://api.moonshot.ai/v1'),(DeepSeekProvider,'https://api.deepseek.com')]:
             body={'choices':[{'message':{'content':'A thoughtful answer'}}]}
             with patch.object(httpx.AsyncClient,'request',AsyncMock(return_value=self.response(body))) as request:
                 self.assertEqual(asyncio.run(cls('chosen','test-key','https://untrusted.test').complete('System','Text')),'A thoughtful answer')

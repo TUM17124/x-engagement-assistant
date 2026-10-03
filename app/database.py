@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from .paths import data_dir
 
 DB_PATH = data_dir() / "workspace.sqlite3"
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 10
 MIGRATIONS = [
 """
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -130,11 +130,37 @@ def conn():
     finally:
         connection.close()
 
+MIGRATIONS.append("""
+CREATE TABLE ai_connections (id TEXT PRIMARY KEY, config TEXT NOT NULL, health TEXT NOT NULL DEFAULT '{}');
+CREATE TABLE ai_model_cache (connection_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, fetched_at REAL NOT NULL, models TEXT NOT NULL);
+CREATE TABLE ai_requests (id INTEGER PRIMARY KEY, provider TEXT NOT NULL, model TEXT NOT NULL, feature TEXT NOT NULL,
+ created_at TEXT NOT NULL, duration_ms INTEGER NOT NULL, input_tokens INTEGER, output_tokens INTEGER,
+ status TEXT NOT NULL, finish_reason TEXT NOT NULL DEFAULT '', request_id TEXT NOT NULL DEFAULT '', prompt TEXT);
+""")
+
+MIGRATIONS.append("""
+CREATE TABLE trend_items(id TEXT PRIMARY KEY,source TEXT NOT NULL,data TEXT NOT NULL,observed_at TEXT NOT NULL,
+ saved INTEGER NOT NULL DEFAULT 0,ignored INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE trend_sources(source TEXT PRIMARY KEY,fetched_at TEXT NOT NULL DEFAULT '',next_fetch REAL NOT NULL DEFAULT 0,error TEXT NOT NULL DEFAULT '');
+CREATE INDEX trend_observed ON trend_items(observed_at);
+""")
+
+MIGRATIONS.append("""
+CREATE TABLE video_jobs(id TEXT PRIMARY KEY,provider TEXT NOT NULL,model TEXT NOT NULL,prompt TEXT NOT NULL,
+ fingerprint TEXT NOT NULL,remote_id TEXT NOT NULL DEFAULT '',status TEXT NOT NULL,created_at TEXT NOT NULL,
+ next_poll REAL NOT NULL DEFAULT 0,media_id TEXT NOT NULL DEFAULT '',error TEXT NOT NULL DEFAULT '');
+CREATE INDEX video_fingerprint ON video_jobs(fingerprint);
+""")
+
 def init_db():
     with conn() as c:
         version = c.execute("PRAGMA user_version").fetchone()[0]
         if version > SCHEMA_VERSION:
             raise RuntimeError("This database belongs to a newer application version.")
+        if 0 < version < SCHEMA_VERSION:
+            backup = DB_PATH.with_name("before-schema-" + str(SCHEMA_VERSION) + ".sqlite3")
+            if not backup.exists():
+                with sqlite3.connect(backup) as target: c.backup(target)
         for index in range(version, SCHEMA_VERSION):
             c.executescript("BEGIN IMMEDIATE;\n" + MIGRATIONS[index] +
                             f"\nPRAGMA user_version={index + 1};\nCOMMIT;")

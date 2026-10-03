@@ -146,11 +146,12 @@ def analytics():
 async def suggest(data:dict):
     task=str(data.get("task","Write"))[:120];platform=str(data.get("platform","x"));definition(platform)
     text=str(data.get("text",""))[:12000]
-    context={"my_profile":prefs.get("my_profile"),"brand_voice":prefs.get("brand_voice"),"product":prefs.get("product")}
+    from ..ai_connections import writing_context
+    context=writing_context()
     if task=="Weekly plan":
         from ..planner import weekly_plan
         return await weekly_plan(platform,str(data.get("timezone","UTC")),text)
-    result=await ws.ai_call(lambda:ai_provider().rewrite(text,task+" for "+CATALOG[platform]["name"]+
+    result=await ws.ai_call(lambda:ai_provider("posts").rewrite(text,task+" for "+CATALOG[platform]["name"]+
         ". Create original, useful content; never copy a creator's wording or invent metrics. Suggestions only. Respect the target's "+str(CATALOG[platform]["limit"])+" character limit. Truthful context: "+json.dumps(context)))
     return {"text":result,"quality":social.quality(result,text)}
 

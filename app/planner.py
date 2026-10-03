@@ -21,7 +21,11 @@ async def weekly_plan(platform="x", timezone_name="UTC", goal=""):
         "product": prefs.get("product"), "trends": trends()[:5],
         "ideas": db.rows("SELECT title,text FROM ideas ORDER BY id DESC LIMIT 8"),
         "recent_published": db.rows("SELECT platform,final_text FROM activity WHERE status='published' ORDER BY id DESC LIMIT 12")}
-    selected = provider()
+    from .ai_connections import writing_context, policy
+    for key in ("my_profile","brand_voice","product"):context.pop(key,None)
+    context.update(writing_context())
+    if not policy().send_conversation:context.pop("recent_published",None)
+    selected = provider("planner")
     text = (await ws.ai_call(lambda: selected.generate_plan(context))).strip()
     if not text or text.upper().strip(' .!') == "SKIP":
         raise ValueError("The AI did not return a weekly plan. Add interests or a goal and try again. Your previous plan is unchanged.")

@@ -29,6 +29,9 @@ for (const file of [
   "social",
   "social-actions",
   "terminal",
+  "ai-providers",
+  "trends",
+  "video",
 ])
   vm.runInContext(fs.readFileSync("app/static/" + file + ".js", "utf8"), ctx, {
     filename: file + ".js",
@@ -38,7 +41,7 @@ vm.runInContext(
 config={onboarded:true,ai_provider:'gemini',ai_model:'test',interests:[],theme:'dark',image_provider:{},social_max_feed:200,social_daily_request_cap:100};
 const account={platform:'facebook',name:'Facebook Pages',home:'https://facebook.com/',limit:63206,note:'Test permissions',connected:false,account:{},capabilities:{can_manual:true},config:{},choices:[]};
 const emptyAPI={
- '/api/terminal/automations':{items:[],runs:[],paused:false},'/api/chatgpt/status':{connected:false,profiles:[],state:'Disconnected'},'/api/social/accounts':[account],'/api/social/brief':{needs_review:0,high_priority:[],high_priority_count:0,mentions:0,comments:0,scheduled:[],trends:[],recommendation:'Review useful items'},
+ '/api/video/settings':{config:{},providers:[]},'/api/video/jobs':[], '/api/trend-radar':{items:[],sources:[],settings:{sources:[],daily_refresh_limit:24},note:'Cached public evidence'},'/api/terminal/automations':{items:[],runs:[],paused:false},'/api/chatgpt/status':{connected:false,profiles:[],state:'Disconnected'},'/api/social/accounts':[account],'/api/social/brief':{needs_review:0,high_priority:[],high_priority_count:0,mentions:0,comments:0,scheduled:[],trends:[],recommendation:'Review useful items'},
  '/api/social/analytics':{activity:[],topics:[],accounts:[],drafts:[],acceptance:[],note:'Local only'},
 };
 api=async path=>emptyAPI[path]||[];

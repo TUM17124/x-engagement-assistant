@@ -14,6 +14,9 @@ PUBLIC_SECRET_NAMES = {"x_client_secret", "x_bearer_token", "ai_api_key", "image
 class SecretStore:
     def __init__(self, directory=None):
         self.directory = directory or data_dir() / "secrets"
+        self.service=SERVICE
+        if directory is not None or os.getenv("XEA_DATA_DIR"):
+            self.service += "."+hashlib.sha256(str(self.directory.resolve()).encode()).hexdigest()[:16]
 
     def _path(self, name):
         return self.directory / (hashlib.sha256(name.encode()).hexdigest() + ".bin")
@@ -45,6 +48,10 @@ class SecretStore:
         import keyring
         backend = keyring.get_keyring()
         module = type(backend).__module__.lower()
+        if "chainer" in module:
+            candidates=[b for b in getattr(backend,"backends",[]) if any(part in type(b).__module__.lower() for part in ("secretservice","macos","kwallet"))]
+            if candidates:
+                backend=candidates[0];keyring.set_keyring(backend);module=type(backend).__module__.lower()
         if not any(part in module for part in ("secretservice", "macos", "kwallet")):
             raise RuntimeError("An OS keychain is required. Install/unlock the system keychain; plaintext storage is disabled.")
         return keyring
@@ -54,7 +61,7 @@ class SecretStore:
             if sys.platform == "win32":
                 path = self._path(name)
                 return self._crypt(path.read_bytes(), True).decode() if path.exists() else ""
-            return self._keyring().get_password(SERVICE, name) or ""
+            return self._keyring().get_password(self.service, name) or ""
 
     def set(self, name, value):
         with _LOCK:
@@ -67,7 +74,7 @@ class SecretStore:
                 temporary.write_bytes(self._crypt(value.encode()))
                 temporary.replace(path)
             else:
-                self._keyring().set_password(SERVICE, name, value)
+                self._keyring().set_password(self.service, name, value)
 
     def delete(self, name):
         with _LOCK:
@@ -75,8 +82,8 @@ class SecretStore:
                 self._path(name).unlink(missing_ok=True)
             else:
                 ring = self._keyring()
-                if ring.get_password(SERVICE, name):
-                    ring.delete_password(SERVICE, name)
+                if ring.get_password(self.service, name):
+                    ring.delete_password(self.service, name)
 
     def masked(self, name):
         value = self.get(name)

@@ -10,9 +10,9 @@ AI helps discover, summarize, rank, draft, and organize. You review, edit, and a
 
 [**Download for Windows**](https://github.com/TUM17124/x-engagement-assistant/releases/latest/download/Social-Engagement-Command-Center-Setup.exe) ? [Release notes](https://github.com/TUM17124/x-engagement-assistant/releases/latest) ? [Source code](https://github.com/TUM17124/x-engagement-assistant)
 
-Windows is the first supported desktop target. Run the NSIS installer from a tested release/build, launch **Social Engagement Command Center**, and complete onboarding. End users do not install Python, Node.js, Rust, or Git and do not edit an environment file.
+Windows is the currently verified desktop target. Native macOS (Apple Silicon and Intel) DMG and Linux DEB/AppImage build workflows are included; see [platform packaging](docs/DESKTOP-PLATFORMS.md) for commands and release-signing requirements. These new native targets need runner validation before publishing. Run the NSIS installer from a tested release/build, launch **Social Engagement Command Center**, and complete onboarding. End users do not install Python, Node.js, Rust, or Git and do not edit an environment file.
 
-1. Choose **Continue with ChatGPT**, or explicitly select another AI provider.
+1. Choose your AI provider: cloud BYOK, a local model, or a custom endpoint.
 2. Authorize in your normal browser. Return to the app and choose an available model.
 3. Connect social accounts independently, or start with manual post import.
 4. Add interests and watched accounts.
@@ -54,11 +54,33 @@ OAuth and inference contracts have automated mocked tests. On 2026-10-02 the ins
 
 Official references: [registration](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), [accounts and refresh](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions), [models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference), [usage/error recovery](https://developers.openai.com/siwc/token-sharing-open-source/errors-and-recovery).
 
-## Optional AI providers
+## Bring your own AI provider
 
-Settings supports ChatGPT Plan, Gemini, OpenAI API key, an OpenAI-compatible endpoint, and local Ollama. Existing saved provider configuration is preserved. Enter keys in the UI; each provider's key is stored separately through the OS vault. Ollama needs a local server/model.
+**Social Engagement does not require one specific AI company.** Connect the AI provider you choose through **Settings ? AI Providers**. Add multiple connections, test access, discover models, save, then explicitly select your primary. No `.env` editing is needed. Providers are shown alphabetically.
 
-An environment file is an optional contributor mechanism. Source runs can import the existing AI_BASE_URL, AI_API_KEY, and AI_MODEL configuration once. Bundled builds never load .env.
+| Provider | Cloud/Local | Setup | Model discovery | Status |
+|---|---|---|---|---|
+| Anthropic Claude | Cloud | [Setup](https://platform.claude.com/settings/keys) | Yes | Adapter + mocked tests |
+| Cohere | Cloud | [Setup](https://dashboard.cohere.com/api-keys) | Yes | Adapter + mocked tests |
+| DeepSeek | Cloud | [Setup](https://platform.deepseek.com/api_keys) | Yes | Adapter + mocked tests |
+| Google Gemini | Cloud | [Setup](https://aistudio.google.com/apikey) | Yes | Adapter + mocked tests |
+| Groq | Cloud | [Setup](https://console.groq.com/keys) | Yes | Adapter + mocked tests |
+| Kimi | Cloud | [Setup](https://platform.kimi.ai/) | Yes | Adapter + mocked tests |
+| LM Studio | Local | [Setup](https://lmstudio.ai/docs/developer/core/authentication) | Yes | Adapter + mocked tests |
+| Mistral AI | Cloud | [Setup](https://console.mistral.ai/api-keys) | Yes | Adapter + mocked tests |
+| Ollama | Local | [Setup](https://docs.ollama.com/api/authentication) | Yes | Adapter + mocked tests |
+| OpenAI | Cloud | [Setup](https://platform.openai.com/api-keys) | Yes | Adapter + mocked tests |
+| OpenRouter | Gateway | [Setup](https://openrouter.ai/settings/keys) | Yes | Adapter + mocked tests |
+| Together AI | Gateway | [Setup](https://api.together.ai/settings/projects/~current/api-keys) | Yes | Adapter + mocked tests |
+| xAI / Grok | Cloud | [Setup](https://console.x.ai/team/default/api-keys) | Yes | Adapter + mocked tests |
+| Custom OpenAI-compatible | Cloud or local | Enter your endpoint | When server supports `/models` | Adapter + mocked tests |
+| ChatGPT authorized plan | Cloud, optional | Official browser authorization | Account catalog | Existing integration retained |
+
+Open **Help / Documentation** inside the app for setup, privacy, pricing and troubleshooting links, or read the [official research records](docs/ai-providers/README.md). Recommendations are checked against the live catalog; no model name is guaranteed permanent. Consumer chat subscriptions do not automatically grant API access. OpenRouter offers official browser PKCE authorization as well as manual keys.
+
+Keys use the OS vault. Configure **Local AI Only**, context-sharing switches, request logging, optional fallback and per-feature provider/model choices in AI Providers. Fallback is off by default and may incur charges if you enable it. It never handles authentication, billing or permission errors by charging a different provider. Interrupted streams require an explicit retry. **AI Usage** shows returned token counts without inventing prices or saving prompts by default.
+
+Optional contributor `.env` values are imported once. Existing AI_BASE_URL, AI_API_KEY and AI_MODEL values migrate with a private backup; original credentials/configuration are retained. Installed builds never read `.env`.
 
 ## AI Terminal
 
@@ -91,7 +113,7 @@ The recurring workflow and its costs are shown for review before activation. Tha
 
 The terminal also explains connection setup, answers account-status questions, opens app screens and operates shared drafts, schedules, ideas, media metadata and analytics. After an exact action preview, type **yes** to confirm that single action or **no** to cancel. Editing the draft invalidates its preview. File uploads and credentials still use their dedicated GUI forms.
 
-Commands stream progress and ChatGPT text. Stop cancels the operation; completed local work remains visible. Arrow keys recall history, /search searches it, and Clear clears the display. History stays local. Never paste credentials into the terminal.
+Commands stream progress and supported provider text. Stop cancels the operation; completed local work remains visible. Arrow keys recall history, /search searches it, and Clear clears the display. History stays local. Never paste credentials into the terminal.
 
 [Full command reference](docs/AI-TERMINAL.md)
 
@@ -111,7 +133,7 @@ Automations persist in SQLite, run bounded reads/drafting, and keep step/run his
 
 Watchlist monitoring uses official access and configured intervals. Some networks cannot monitor arbitrary creators; Open Original and manual import remain available.
 
-Trend Radar compares counts in **your local retrieved/imported sample** across two 24-hour windows. It is not a global trend feed or virality prediction. Impressions and follower growth are never invented.
+Trend Radar combines public API source rankings with interest matching, media previews and review-only AI drafts. Its separate connected-feed section compares your locally imported sample across two 24-hour windows. Neither view claims global coverage or predicts virality; metrics are never invented.
 
 Writing Voice, Brand Voice, My Profile, and visible application preferences provide optional context. Inspect or clear this app's memory in Settings. Edits do not silently create hidden profiles.
 
@@ -186,8 +208,17 @@ export drafts
 
 Commands that change settings, approve publishing or delete items show the exact action first. Type `yes` only after reviewing one pending preview, or `no` to cancel. Natural language uses the same validated tools. A changed target invalidates its pending approval. Basic explicit commands continue to work when AI usage is exhausted.
 
-Grok, Claude, Kimi and DeepSeek connect through official developer APIs in Settings > AI Provider. Follow the provider-console link, create a key, enter an available model, save and test. Keys use the existing OS-protected vault and remain separate for each provider. Claude also supports the optional workspace ID required by multi-workspace keys. These are API connections, not consumer subscription OAuth. Existing ChatGPT plan authorization is unchanged; the app never automatically switches to a chargeable provider.
+Grok, Claude, Kimi and DeepSeek connect through official developer APIs in Settings > AI Provider. Follow the provider-console link, create a key, enter an available model, save and test. Keys use the existing OS-protected vault and remain separate for each provider. Claude also supports the optional workspace ID required by multi-workspace keys. These are API connections, not consumer subscription OAuth. Existing ChatGPT plan authorization is unchanged; fallback requires explicit configuration; billing/authentication failures never trigger it.
 
 Official references: [xAI](https://docs.x.ai/developers/quickstart), [Claude authentication](https://platform.claude.com/docs/en/manage-claude/authentication), [Kimi](https://platform.kimi.ai/docs/overview), [DeepSeek](https://api-docs.deepseek.com/).
 
 For local validation diagnostics, set `XEA_DEBUG_VALIDATION=1` in a developer session. Logs include only schema names, field names and error codes, never supplied values or credentials. See [profile/control implementation report](docs/PROFILE-CONTROL-REPORT.md) for exact changes and verification limits.
+
+
+## Public Trend Radar and video creation
+
+[Trend Radar](docs/TREND-RADAR.md) now reads official Mastodon, DEV/Forem, PeerTube and Hacker News APIs without X credentials. Filter by interests/source/media, inspect available video/audio, save evidence and ask your chosen AI provider for an original draft. Every result states its source and sample limits; drafts wait in Response Inbox.
+
+[Video Generation](docs/VIDEO-GENERATION.md) has a separate Settings screen and Media Library workflow for Gemini Veo and xAI video APIs. Configure your own key/model, explicitly confirm generation charges, check persistent job status and save the resulting MP4 locally. Video generation never publishes automatically. No Sora adapter is offered because its API is officially shut down.
+
+[Desktop platform guide](docs/DESKTOP-PLATFORMS.md): Windows EXE, macOS DMG (both architectures), Linux DEB/AppImage. Builds bundle the backend/runtime. macOS distribution needs maintainer signing/notarization, and Linux requires an unlocked OS keychain.

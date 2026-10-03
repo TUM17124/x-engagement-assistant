@@ -32,7 +32,9 @@ def get_profile():
 def save_profile(patch:ProfilePatch):
     value={**get_profile(),**patch.model_dump(exclude_unset=True)}
     prefs.save({"my_profile":value})
-    return value
+    actual=get_profile()
+    if actual!=value:raise ValueError("Profile save could not be verified. Reopen Settings before retrying.")
+    return actual
 
 @router.get("")
 def read_profile():return get_profile()

@@ -76,3 +76,8 @@ Commit and push the tested source, then upload a draft or publish the release:
 Signing keys live outside the repository, with an encrypted private key and an OS-protected password. Do not regenerate the key for an established product or replace published version assets. Forks must change the repository URLs and signing identity before distributing their own builds.
 
 See [Updates and release process](UPDATES.md).
+
+
+## macOS and Linux
+
+Native macOS (Apple Silicon and Intel) DMG and Linux DEB/AppImage builds are described in [DESKTOP-PLATFORMS.md](DESKTOP-PLATFORMS.md). The repository includes separate native CI runners, Python sidecars, platform icons and secure-keychain smoke tests. Do not distribute a cross-platform artifact until its native build and runtime checks pass.

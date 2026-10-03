@@ -16,9 +16,5 @@ async def delete_draft(draft_id):
         return {"deleted":True,"message":"Draft #"+str(draft_id)+" deleted from the inbox. Its schedule is cancelled. Activity and duplicate protection are preserved."}
 
 def context_patch(section,fields):
-    allowed={"voice":{"who","build","company","expertise","tone","never","like","hate"},
-        "product":{"name","website","description","customers","features","problems","forbidden","cta"},
-        "brand_voice":{"Tone","Humor level","Technical level","Preferred sentence length","Emoji preference","Words to avoid","Favorite phrases","Banned phrases"}}
-    if set(fields)-allowed[section]:raise ValueError("Unknown context field. Read Settings for the supported field names.")
-    values={**prefs.get(section),**fields};prefs.save({section:values})
-    return {"message":"Writing context updated.","section":section,"fields":values}
+    from .context_settings import ContextUpdate,save_context
+    return save_context(ContextUpdate(**{section:fields}))

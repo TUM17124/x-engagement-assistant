@@ -135,7 +135,11 @@ async def _generate_reply(feed_id, style="", draft_id=None):
         if style:
             source["current_draft"] = current["text"]
     source["platform"]=feed.get("platform","x")
-    result = await ai_call(lambda: provider().generate_reply(source,style,rank=True))
+    selected = provider("replies")
+    result = await ai_call(lambda: selected.generate_reply(source,style,rank=True))
+    actual=getattr(selected,"last_result",None)
+    used_provider=getattr(actual,"provider",getattr(selected,"kind",prefs.get("ai_provider")))
+    used_model=getattr(actual,"model",selected.model)
     clean = re.sub(r"^\`\`\`(?:json)?\s*|\s*\`\`\`$", "", result.strip())
     try:
         data = json.loads(clean)
@@ -155,9 +159,11 @@ async def _generate_reply(feed_id, style="", draft_id=None):
             raise ValueError("Draft does not match this source.")
         updated = save_draft("reply",text,feed_id,draft_id=draft_id)
         db.execute("UPDATE drafts SET generated_text=?,provider=?,model=?,reason=?,score=?,topic=? WHERE id=?",
-                   (text,prefs.get("ai_provider"),(prefs.get("chatgpt_model") if prefs.get("ai_provider")=="chatgpt" else prefs.get("ai_model")),reason,score,topic,draft_id))
+                   (text,used_provider,used_model,reason,score,topic,draft_id))
         return get_draft(draft_id)
     draft = save_draft("reply",text,feed_id,text,reason,score,topic)
+    db.execute("UPDATE drafts SET provider=?,model=? WHERE id=?",(used_provider,used_model,draft["id"]))
+    draft=get_draft(draft["id"])
     notify("A new reply draft is ready for review.")
     return draft
 

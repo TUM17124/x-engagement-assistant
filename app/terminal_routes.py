@@ -43,7 +43,9 @@ def automations():
 def memory():return db.rows("SELECT * FROM application_memory ORDER BY key")
 
 async def run_command(data,queue):
+    completed=[]
     def emit(value):
+        if value.get("type")=="tool_result":completed.append({"tool":value["tool"],"result":bus.redact(value["data"])})
         if queue.qsize()<2000:queue.put_nowait(bus.redact(value))
     marker=STREAM_SINK.set(emit)
     try:
@@ -70,8 +72,9 @@ async def run_command(data,queue):
     except Exception as error:
         from .errors import ServiceError
         message=str(error) if isinstance(error,(ValueError,ServiceError)) else "The command failed. Check connection status; completed local work is retained."
+        if completed:message+=" Completed before this failure: "+", ".join(v["tool"] for v in completed)+". Those changes are retained."
         message=bus.redact(message)
-        db.execute("UPDATE terminal_commands SET status='failed',finished_at=?,result=? WHERE id=?",(db.now(),json.dumps({"error":message}),data.id))
+        db.execute("UPDATE terminal_commands SET status='failed',finished_at=?,result=? WHERE id=?",(db.now(),json.dumps({"error":message,"data":completed,"report":{"state":"attention","message":message}}),data.id))
         emit({"type":"error","text":message,"technical":error.details()["technical"] if isinstance(error,ServiceError) else ""})
     finally:
         STREAM_SINK.reset(marker)

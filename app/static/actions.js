@@ -1,4 +1,7 @@
 async function doAction(a,id,el){
+if(a.startsWith('video-'))return videoAction(a,id,el);
+if(a.startsWith('radar-'))return radarAction(a,id,el);
+if(a.startsWith('ai-'))return aiAction(a,id,el);
 if(a.startsWith('ms-'))return msAction(a.slice(3),id,el);
 if(a.startsWith('social-'))return socialAccountAction(a,id);
 if(a==='onboard-back'){onStep--;wizard();return}

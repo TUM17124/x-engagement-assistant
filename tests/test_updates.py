@@ -11,7 +11,7 @@ def release(version="9.0.0"):
     base=updates.GITHUB+"/releases/download/v"+version+"/"
     return {"tag_name":"v"+version,"html_url":updates.GITHUB+"/releases/tag/v"+version,
             "body":"A real release note.","assets":[{"name":name,"browser_download_url":base+name}
-            for name in (updates.ASSET,updates.ASSET+".sig","latest.json")]}
+            for name in (updates.ASSET,updates.UPDATE_ASSET+".sig","latest.json")]}
 
 class UpdateTests(AppTest):
     def response(self,status,data=None,headers=None):
@@ -122,3 +122,16 @@ class UpdateTests(AppTest):
     def test_installed_version_does_not_keep_stale_update_badge(self):
         db.set_setting("release_status",{"version":updates.VERSION,"available":True})
         self.assertFalse(self.client.get("/api/updates").json()["release"]["available"])
+
+    def test_release_message_distinguishes_local_build_and_published_release(self):
+        with patch.object(updates,"VERSION","0.3.2"):
+            self.assertIn("Unpublished local changes",updates.release_message({"version":"0.3.2","checked_at":"today"}))
+            self.assertIn("newer than",updates.release_message({"version":"0.3.1","checked_at":"today"}))
+            self.assertIn("is available",updates.release_message({"version":"0.3.3","checked_at":"today"}))
+            self.assertIn("No successful",updates.release_message({"version":"0.3.2"}))
+            self.assertEqual(updates.release_message({"error":"Offline"}),"Offline")
+
+    def test_update_api_explains_unpublished_local_changes(self):
+        db.set_setting("release_status",{"version":updates.VERSION,"checked_at":"today"})
+        response=self.client.get("/api/updates").json()
+        self.assertIn("Unpublished local changes",response["release_message"])

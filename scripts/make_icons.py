@@ -12,3 +12,5 @@ draw.line([(153,94),(105,145)],fill="#111621",width=15)
 for size in (32,128,256):
     image.resize((size,size),Image.Resampling.LANCZOS).save(root/f"{size}x{size}.png")
 image.save(root/"icon.ico",sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])
+
+image.resize((1024,1024),Image.Resampling.LANCZOS).save(root/"icon.icns")

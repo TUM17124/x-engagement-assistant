@@ -59,11 +59,11 @@ def next_steps(tool,value):
 
 def completion_report(result):
     if result.get("approvalIds"):
-        return {"state":"waiting","message":"I have prepared "+str(len(result["approvalIds"]))+" action request(s). Review the exact preview. Nothing has been sent. For one preview, type yes to confirm or no to cancel.","suggestions":[{"label":"Review Approval Center","url":"#control-approvals"}]}
+        return {"state":"waiting","message":"I have prepared "+str(len(result["approvalIds"]))+" action request(s). Review the exact preview. These pending changes have not been saved or executed. Nothing has been sent. For one preview, type yes to confirm or no to cancel.","suggestions":[{"label":"Review Approval Center","url":"#control-approvals"}]}
     lines=[];suggestions=[]
     for item in result.get("data",[]):
         lines.append(describe(item["tool"],item["result"]))
         for step in next_steps(item["tool"],item["result"]):
             if step not in suggestions:suggestions.append(step)
-    return {"state":"completed" if result.get("success",True) else "attention",
+    return {"state":"completed" if result.get("success",True) and result.get("data") else "attention",
         "message":"\n\n".join(lines) or result.get("message") or "Finished. No public action was taken.","suggestions":suggestions[:3]}

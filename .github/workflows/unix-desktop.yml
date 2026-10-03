@@ -1,0 +1,71 @@
+name: macOS and Linux desktop
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, desktop]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: aarch64-apple-darwin
+            config: macos
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            config: macos
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            config: linux
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      TAURI_ENV_TARGET_TRIPLE: ${{ matrix.target }}
+      APPIMAGE_EXTRACT_AND_RUN: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Linux build and secure-keyring dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev patchelf libfuse2 gnome-keyring dbus-x11
+      - run: python -m pip install -r requirements-build.txt
+      - run: npm ci
+      - run: python -B scripts/secret_scan.py
+      - run: python -B -m unittest discover -s tests -v
+      - run: npm run check:ui
+      - run: python scripts/make_icons.py
+      - run: python scripts/build_backend.py
+      - name: Packaged backend smoke (macOS Keychain)
+        if: runner.os == 'macOS'
+        run: python scripts/smoke_backend.py src-tauri/binaries/xea-backend-${{ matrix.target }}
+      - name: Packaged backend smoke (Linux Secret Service)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          dbus-run-session -- bash -c 'echo smoke-keyring-password | gnome-keyring-daemon --unlock --components=secrets; python scripts/smoke_backend.py src-tauri/binaries/xea-backend-${{ matrix.target }}'
+      - run: python scripts/collect_notices.py
+      - name: Build test installers (no release credentials)
+        run: npm run desktop:build -- --config src-tauri/tauri.${{ matrix.config }}.conf.json --config src-tauri/tauri.ci.conf.json
+      - name: Checksums
+        run: python scripts/package_checksums.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Social-Engagement-${{ matrix.target }}
+          path: artifacts/*
+          if-no-files-found: error

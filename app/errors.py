@@ -5,6 +5,11 @@ class ServiceError(RuntimeError):
         self.service, self.status, self.retry_after = service, status, retry_after
         messages = {
             400: f"{service} rejected this request. Check the content, target and selected model or action before trying again.",
+            408: f"{service} timed out. Try again later or choose another model.",
+            500: f"{service} is temporarily unavailable. Try again later.",
+            502: f"{service} is temporarily unavailable. Try again later.",
+            503: f"{service} is temporarily unavailable. Try again later.",
+            504: f"{service} timed out. Try again later.",
             404: f"The requested {service} item or endpoint is unavailable. Check the target or use the manual workflow.",
             401: f"Your {service} credentials are invalid or expired. Reconnect or replace the key in Settings.",
             402: ("Your current X API project does not have credits/access for this endpoint." if service == "X"

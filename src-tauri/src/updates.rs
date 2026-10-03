@@ -51,7 +51,7 @@ pub fn run(app: AppHandle, token: String, job: Value) {
             return Err("The workspace is still shutting down. Reopen the app before trying the update again.".into());
         }
         if let Some(child)=app.state::<Backend>().child.lock().unwrap().take() { let _=child.kill(); }
-        update.install(&bytes).map_err(|_| "Windows could not start the installer. Reopen the app or download the release from GitHub.")?;
+        update.install(&bytes).map_err(|_| "The system could not start the installer. Reopen the app or download the release from GitHub.")?;
         Ok(())
     })();
     if let Err(message)=result {

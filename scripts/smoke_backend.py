@@ -29,8 +29,11 @@ with tempfile.TemporaryDirectory() as folder:
             assert root.status_code==200 and "Multi-Social AI Engagement Command Center" in root.text
             boot=client.get("/api/bootstrap").json()
             assert not boot["settings"]["onboarded"]
-            assert boot["settings"]["ai_provider"]=="chatgpt"
+            assert boot["settings"]["ai_provider"]==""
             client.headers["X-CSRF-Token"]=boot["csrf"]
+            assert len(client.get("/api/ai/providers").json()["providers"])>=11
+            assert client.get("/api/trend-radar").json()["items"]==[]
+            assert client.put("/api/settings",json={"ai_provider":"gemini"}).status_code==200
             profile={"name":"Isolated packaged test","role":"Founder","bio":"","industry":"Software","expertise":"Coding","products":"Local app","audience":"Creators","goals":"Useful conversations"}
             assert client.put("/api/profile",json=profile).json()==profile
             assert client.get("/api/profile").json()==profile
@@ -64,7 +67,7 @@ with tempfile.TemporaryDirectory() as folder:
             assert "isolated-smoke-key" not in client.get("/api/settings").text
             assert client.post("/api/onboarding/finish").status_code==200
             assert client.get("/api/dashboard").json()["today_writes"]==0
-            print("Packaged runtime smoke passed: launch, dashboard, AI terminal/status, ChatGPT default, automation storage, UI assets, onboarding, settings, secure secret roundtrip, URL parsing, zero writes.")
+            print("Packaged runtime smoke passed: launch, dashboard, AI terminal/status, neutral AI selection, automation storage, UI assets, onboarding, settings, secure secret roundtrip, URL parsing, zero writes.")
             client.post("/desktop/shutdown",headers={"X-Desktop-Token":"isolated-smoke-control"})
             child.wait(timeout=15)
             child=subprocess.Popen([str(binary),"--port","18787"],env=env,creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))

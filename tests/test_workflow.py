@@ -83,6 +83,9 @@ class WorkflowTests(AppTest):
     def test_reply_generation_ranking_skip_and_budget(self):
         f=self.source()
         with patch("app.workspace.provider") as factory:
+            factory.return_value.kind="gemini"
+            factory.return_value.model="mock-model"
+            factory.return_value.last_result=None
             factory.return_value.generate_reply=AsyncMock(return_value=json.dumps({"reply":"How do you search your notes?","reason":"Specific PDF workflow question","score":87,"topic":"PDFs"}))
             d=self.post("/api/generate/reply",{"feed_id":f["id"]}).json()
             self.assertEqual(d["score"],87)

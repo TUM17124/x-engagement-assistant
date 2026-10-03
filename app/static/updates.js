@@ -1,15 +1,15 @@
 let updateState=null,updatePollTimer=null,updateWorkId=null,updateLastJob='';
 function updatesPage(){
  const d=updateState||{},r=d.release||{},j=d.installation||{};
- const message=r.error||r.message||(r.available?'Version '+r.version+' is available.':r.checked_at?'You have the latest published version.':'No update check has completed yet.');
- return '<h2>App updates</h2><p>Installed version: '+esc(d.current_version||'0.3.1')+'</p><div class="notice '+(r.error?'warning':'')+'">'+esc(message)+'</div>'+
+ const message=d.release_message||r.error||r.message||(r.available?'Published version '+r.version+' is available.':'No successful GitHub release check has completed yet.');
+ return '<h2>App updates</h2><p>Installed version: '+esc(d.current_version||'Unknown')+'</p><div class="notice '+(r.error?'warning':'')+'">'+esc(message)+'</div>'+
  '<div class="row"><button type="button" data-update="check">Check for updates</button>'+
- (r.available?(d.desktop&&r.signed?'<button type="button" data-update="install">Update to '+esc(r.version)+'</button>':link('Download Windows installer',r.download_url)):'')+
+ (r.available?(d.desktop&&r.signed?'<button type="button" data-update="install">Update to '+esc(r.version)+'</button>':link('Download installer for this device',r.download_url)):'')+
  link('GitHub releases',(d.repository||'https://github.com/TUM17124/x-engagement-assistant')+'/releases')+'</div>'+
  (r.checked_at?'<p class="hint">Last checked: '+esc(fmt(r.checked_at))+'</p>':'')+
  (r.notes?'<details><summary>Release notes</summary><p class="post-text">'+esc(r.notes)+'</p></details>':'')+
  (j.message?'<div class="notice" id="update-install-status">'+esc(j.message)+'</div>':'<div id="update-install-status"></div>')+
- '<p class="hint">Updates come from published GitHub releases. The installer is signature-checked and asks for your approval. The app closes during installation; saved accounts and drafts are retained. No Git, Python or terminal is needed.</p>'+
+ '<p class="hint">Updates check published GitHub releases only. Editing this repository or building an installer does not update the installed app. A local build must be installed separately; it will not appear on GitHub until published. The installer is signature-checked and asks for your approval. The app closes during installation; saved accounts and drafts are retained. No Git, Python or terminal is needed.</p>'+
  '<form id="update-settings-form">'+check('Check GitHub for updates while this app is running','check_updates',d.settings?.check_updates??true)+'<p class="hint">Checks run at most once every six hours. No update installs automatically.</p><button type="submit">Save update preference</button></form>'+
  '<hr class="divider"><h2>Free email updates</h2><p>Get a release email even while this app is closed. No API key, sender setup, or GitHub account is needed.</p>'+
  '<button type="button" data-update="email">Get free email updates</button>'+
@@ -48,7 +48,7 @@ document.addEventListener('click',async e=>{
   if(action==='check'){
    updateState=await api('/api/updates/check','POST');const r=updateState.release||{};
    if(r.error)throw Error(r.error);
-   reportWork({state:'completed',message:r.available?'Version '+r.version+' is ready for your review. Choose Update when convenient.':r.message||'You have the latest published version.'});
+   reportWork({state:'completed',message:r.available?'Version '+r.version+' is ready for your review. Choose Update when convenient.':updateState.release_message||r.message||'No successful GitHub release check has completed yet.'});
    return render();
   }
   if(action==='email'){
